@@ -1,0 +1,1021 @@
+/* =========================================================
+   Gullak · overlays
+   sheets · receipt palette · toasts · celebration · vault lock · welcome
+   ========================================================= */
+
+/* ---------- scrim: a halftone wash instead of a blur ---------- */
+.g-scrim {
+  position: absolute;
+  inset: 0;
+  background-color: var(--scrim);
+  background-image: radial-gradient(rgb(0 0 0 / .2) 1px, transparent 1.6px);
+  background-size: 6px 6px;
+}
+
+.g-scrim--light {
+  background-color: color-mix(in srgb, var(--scrim) 55%, transparent);
+}
+
+/* ---------- sheet ---------- */
+.g-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+}
+
+.g-sheet {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--bw) solid var(--frame);
+  overflow: clip;
+}
+
+.g-sheet:focus {
+  outline: none;
+}
+
+.g-sheet--card {
+  width: min(560px, 100% - 32px);
+  max-height: calc(100dvh - 48px);
+  margin: auto;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+.g-sheet--card.g-sheet--wide {
+  width: min(760px, 100% - 32px);
+}
+
+.g-sheet--bottom {
+  width: 100%;
+  max-height: 88dvh;
+  margin-top: auto;
+  border-bottom: 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  box-shadow: 0 -5px 0 var(--drop);
+}
+
+.g-sheet__grab {
+  display: grid;
+  place-items: center;
+  flex: none;
+  height: 22px;
+  margin-bottom: -1px;
+  background: var(--tone);
+  cursor: grab;
+  touch-action: none;
+}
+
+.g-sheet__grab:active {
+  cursor: grabbing;
+}
+
+.g-sheet__grab > span {
+  width: 44px;
+  height: 5px;
+  background: var(--coal);
+  border-radius: 99px;
+  opacity: .5;
+}
+
+.g-sheet__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding: 16px 18px 14px;
+  border-bottom: var(--bw) solid var(--frame);
+  background-image: radial-gradient(rgb(21 21 21 / .1) 1px, transparent 1.5px);
+  background-size: 8px 8px;
+}
+
+.g-sheet__head .g-kicker {
+  margin-bottom: 5px;
+}
+
+.g-sheet__title {
+  font: 800 clamp(1.3rem, 1.1rem + 1vw, 1.6rem)/1.05 var(--font-display);
+  letter-spacing: -.03em;
+}
+
+.g-sheet__head .g-icon-btn {
+  margin: -3px -5px 0 0;
+}
+
+.g-sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 18px 18px 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.g-sheet--bottom .g-sheet__body {
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+/* The form's button row rides along the bottom of a long sheet. */
+.g-sheet__body:has(> .g-form > .g-form__actions:last-child) {
+  padding-bottom: 0;
+}
+
+.g-sheet__body > .g-form > .g-form__actions:last-child {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin: 0 -18px;
+  padding: 14px 18px max(16px, env(safe-area-inset-bottom));
+  background: var(--surface);
+}
+
+/* ---------- command palette: a till receipt that prints downwards ---------- */
+.g-palette-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+}
+
+.g-receipt {
+  position: absolute;
+  top: max(6vh, 20px);
+  left: 50%;
+  z-index: 1;
+  width: min(540px, 100% - 24px);
+  translate: -50% 0;
+  filter: drop-shadow(5px 6px 0 var(--drop));
+}
+
+.g-receipt__slot {
+  position: relative;
+  z-index: 1;
+  height: 16px;
+  margin: 0 -12px;
+  background: var(--frame);
+  border-radius: 9px;
+}
+
+.g-receipt__slot::after {
+  content: '';
+  position: absolute;
+  inset: 6px 16px 4px;
+  background: var(--bg);
+  border-radius: 3px;
+  opacity: .55;
+}
+
+.g-receipt__paper {
+  --tone: #fbf8ef;
+  position: relative;
+  margin: -7px 8px 0;
+  padding: 24px 18px 34px;
+  font-family: var(--font-mono);
+  mask: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% / 20px 100%;
+}
+
+/* A barcode to finish the slip. */
+.g-receipt__paper::after {
+  content: '';
+  display: block;
+  width: 64%;
+  height: 26px;
+  margin: 14px auto 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--coal) 0 2px,
+    transparent 2px 4px,
+    var(--coal) 4px 5px,
+    transparent 5px 8px,
+    var(--coal) 8px 11px,
+    transparent 11px 12px,
+    var(--coal) 12px 13px,
+    transparent 13px 17px
+  );
+  opacity: .8;
+}
+
+.g-receipt__brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  font: 500 .7rem/1 var(--font-mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  border-bottom: 2px dashed rgb(21 21 21 / .3);
+}
+
+.g-receipt__brand > span:first-child {
+  font: 800 1.2rem/1 var(--font-display);
+  letter-spacing: .2em;
+  color: var(--ink);
+}
+
+.g-receipt__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 10px 0 12px;
+  color: var(--ink);
+  background: var(--field);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-sm);
+  transition:
+    translate .15s var(--ease-out),
+    box-shadow .15s var(--ease-out);
+}
+
+.g-receipt__search:focus-within {
+  translate: -1px -1px;
+  box-shadow: 3px 3px 0 var(--line);
+}
+
+.g-receipt__search > svg {
+  flex: none;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+}
+
+.g-receipt__search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  font: 500 .92rem/1 var(--font-mono);
+  color: inherit;
+  background: transparent;
+  border: 0;
+  outline: none;
+}
+
+.g-receipt__search input::placeholder {
+  color: var(--ink-3);
+}
+
+.g-receipt__list {
+  max-height: min(50vh, 420px);
+  margin: 10px -6px 0;
+  padding: 0 6px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.g-receipt__section {
+  margin: 12px 0 4px;
+  font: 600 .66rem/1 var(--font-mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.g-receipt__section::before {
+  content: '## ';
+}
+
+.g-receipt__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 6px 8px;
+  font: 500 .86rem/1.2 var(--font-mono);
+  text-align: left;
+  color: var(--ink);
+  border-radius: 6px;
+}
+
+.g-receipt__item:hover:not(.is-active) {
+  background: rgb(21 21 21 / .06);
+}
+
+.g-receipt__item.is-active {
+  color: var(--cream);
+  background: var(--coal);
+}
+
+.g-receipt__item > svg {
+  flex: none;
+  font-size: 1rem;
+  color: var(--ink-2);
+}
+
+.g-receipt__label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-receipt__dots {
+  flex: 1 1 16px;
+  min-width: 16px;
+  translate: 0 4px;
+  border-bottom: 2px dotted rgb(21 21 21 / .3);
+}
+
+.g-receipt__hint {
+  flex: none;
+  font-size: .76rem;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.g-receipt__item .g-kbd {
+  flex: none;
+}
+
+.g-receipt__item.is-active > svg,
+.g-receipt__item.is-active .g-receipt__hint {
+  color: inherit;
+}
+
+.g-receipt__item.is-active .g-receipt__dots {
+  border-color: rgb(242 238 227 / .45);
+}
+
+.g-receipt__empty {
+  padding: 22px 8px;
+  font: 500 .86rem/1.5 var(--font-mono);
+  text-align: center;
+  color: var(--ink-2);
+}
+
+.g-receipt__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  font: 500 .68rem/1 var(--font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border-top: 2px dashed rgb(21 21 21 / .3);
+}
+
+.g-receipt__foot > span:last-child {
+  flex-basis: 100%;
+  margin-top: 6px;
+  letter-spacing: .22em;
+  text-align: center;
+  color: var(--ink-2);
+}
+
+/* ---------- toasts: sticky notes with a burning fuse ---------- */
+.g-toasts {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 90;
+  width: min(360px, 100% - 32px);
+  pointer-events: none;
+}
+
+.g-toasts > ol {
+  display: grid;
+  gap: 10px;
+}
+
+.g-toast {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 8px 15px 14px;
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.g-toast--ink {
+  color: var(--cream);
+  background: var(--coal);
+}
+
+.g-toast__icon {
+  flex: none;
+  font-size: 1.2rem;
+}
+
+.g-toast--ink .g-toast__icon {
+  color: var(--lime);
+}
+
+.g-toast__msg {
+  flex: 1;
+  min-width: 0;
+  font: 650 .88rem/1.35 var(--font-body);
+}
+
+.g-toast__action {
+  --press: 2px;
+  flex: none;
+  padding: 7px 11px;
+  font: 800 .74rem/1 var(--font-display);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--cream);
+  background: var(--coal);
+  border: 2px solid var(--coal);
+  border-radius: 7px;
+  box-shadow: 2px 2px 0 rgb(21 21 21 / .35);
+}
+
+.g-toast--ink .g-toast__action {
+  color: var(--coal);
+  background: var(--lime);
+  border-color: var(--lime);
+  box-shadow: 2px 2px 0 rgb(242 238 227 / .3);
+}
+
+.g-toast__close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  opacity: .7;
+  transition:
+    opacity .15s,
+    background-color .15s;
+}
+
+.g-toast__close:hover {
+  background: rgb(21 21 21 / .1);
+  opacity: 1;
+}
+
+.g-toast--ink .g-toast__close:hover {
+  background: rgb(242 238 227 / .14);
+}
+
+.g-toast__timer {
+  position: absolute;
+  inset: auto 0 0;
+  height: 4px;
+  background: currentColor;
+  opacity: .45;
+  transform-origin: left;
+  animation: g-fuse var(--dur, 4s) linear forwards;
+}
+
+.g-toast:is(:hover, :focus-within) .g-toast__timer {
+  animation-play-state: paused;
+}
+
+@keyframes g-fuse {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ---------- celebration: coins, confetti and a rubber stamp ---------- */
+.g-party {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  pointer-events: none;
+}
+
+.g-party__stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.g-particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+}
+
+.g-particle--coin {
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  background: var(--gold);
+  border: 2px solid var(--coal);
+  border-radius: 50%;
+  box-shadow: inset -3px -3px 0 rgb(0 0 0 / .18);
+}
+
+.g-particle--paper {
+  width: 8px;
+  height: 14px;
+  margin: -7px 0 0 -4px;
+  background: var(--tone);
+  border: 1.5px solid var(--coal);
+  border-radius: 2px;
+}
+
+.g-stamp {
+  position: relative;
+  display: inline-grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 16px 28px 14px;
+  text-align: center;
+  color: var(--coal);
+  background: var(--tone);
+  border: 4px solid var(--coal);
+  border-radius: 16px;
+  outline: 2px solid var(--coal);
+  outline-offset: -11px;
+  box-shadow: 8px 8px 0 var(--drop);
+}
+
+.g-stamp__word {
+  font: 800 clamp(1.9rem, 1.3rem + 3vw, 3.1rem)/.95 var(--font-display);
+  letter-spacing: -.02em;
+  text-transform: uppercase;
+}
+
+.g-stamp__detail {
+  font: 600 .78rem/1.2 var(--font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+/* ---------- vault lock: two steel doors and a combination dial ---------- */
+.g-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  padding: 20px;
+  overflow: auto;
+}
+
+.g-lock__door {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: calc(50% + 1px);
+  background-color: var(--coal);
+  background-image: repeating-linear-gradient(-45deg, rgb(242 238 227 / .045) 0 2px, transparent 2px 13px);
+}
+
+.g-lock__door--left {
+  left: 0;
+}
+
+.g-lock__door--right {
+  right: 0;
+}
+
+/* Hazard tape where the doors meet, and a column of rivets beside it. */
+.g-lock__door::before,
+.g-lock__door::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.g-lock__door::before {
+  width: 10px;
+  background: repeating-linear-gradient(45deg, var(--gold) 0 10px, var(--coal) 10px 20px);
+}
+
+.g-lock__door::after {
+  width: 18px;
+  background: radial-gradient(circle, rgb(242 238 227 / .3) 3px, transparent 3.5px) 50% 0 / 18px 38px;
+}
+
+.g-lock__door--left::before {
+  right: 0;
+}
+
+.g-lock__door--left::after {
+  right: 22px;
+}
+
+.g-lock__door--right::before {
+  left: 0;
+}
+
+.g-lock__door--right::after {
+  left: 22px;
+}
+
+.g-lock__panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(360px, 100%);
+  margin: auto;
+  padding: 26px 22px 20px;
+  color: var(--ink);
+  background: var(--surface);
+  border: var(--bw) solid var(--frame);
+  border-radius: 26px;
+  box-shadow: 8px 8px 0 var(--gold);
+}
+
+.g-lock__dialwrap {
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin-top: 6px;
+}
+
+/* Fixed index mark: the dial turns underneath it. */
+.g-lock__dialwrap::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  z-index: 1;
+  width: 14px;
+  height: 10px;
+  margin-left: -7px;
+  background: var(--ink);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.g-lock__dial {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.g-lock__rim {
+  fill: var(--surface-2);
+  stroke: var(--line);
+  stroke-width: 3;
+}
+
+.g-lock__tick {
+  stroke: var(--ink-3);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.g-lock__tick--major {
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+
+.g-lock__hub {
+  fill: var(--gold);
+  stroke: var(--line);
+  stroke-width: 3;
+  transition: fill .3s;
+}
+
+.g-lock__pointer {
+  fill: var(--coral);
+  stroke: var(--line);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.g-lock__dial.is-ok .g-lock__hub {
+  fill: var(--mint);
+}
+
+.g-lock__dial.is-wrong .g-lock__hub {
+  fill: var(--coral);
+}
+
+.g-lock__keyhole {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 1.75rem;
+  color: var(--coal);
+  pointer-events: none;
+}
+
+.g-lock__hello {
+  font: 700 1.02rem/1.3 var(--font-display);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.g-lock__dots {
+  display: flex;
+  gap: 12px;
+}
+
+.g-lock__dot {
+  width: 16px;
+  height: 16px;
+  border: var(--bw) solid var(--line);
+  border-radius: 50%;
+  transition:
+    background-color .15s,
+    border-color .15s;
+}
+
+.g-lock__dot.is-filled {
+  background: var(--ink);
+  animation: g-plink .32s var(--ease-snap);
+}
+
+.g-lock__dot.is-ok {
+  background: var(--pos);
+  border-color: var(--pos);
+}
+
+@keyframes g-plink {
+  from {
+    scale: .35;
+  }
+}
+
+.g-lock__pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 270px;
+}
+
+.g-lock__key {
+  --press: 3px;
+  height: 54px;
+  font: 700 1.3rem/1 var(--font-mono);
+  color: var(--ink);
+  background: var(--surface-2);
+  border: var(--bw) solid var(--frame);
+  border-radius: 14px;
+  box-shadow: 3px 3px 0 var(--drop);
+}
+
+.g-lock__key:hover {
+  color: var(--coal);
+  background: var(--lime);
+}
+
+.g-lock__key--fn {
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  color: var(--ink-2);
+  background: var(--surface);
+}
+
+.g-lock__forgot {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  font: 500 .86rem/1.5 var(--font-body);
+  text-align: center;
+  color: var(--ink-2);
+}
+
+.g-lock__link {
+  padding: 4px 6px;
+  font: 600 .8rem/1 var(--font-mono);
+  color: var(--ink-2);
+  text-decoration: underline dotted;
+  text-underline-offset: 4px;
+}
+
+.g-lock__link:hover {
+  color: var(--ink);
+}
+
+@media (max-height: 640px) {
+  .g-lock__panel {
+    gap: 10px;
+    padding-top: 20px;
+  }
+
+  .g-lock__dialwrap {
+    width: 96px;
+    height: 96px;
+  }
+
+  .g-lock__keyhole {
+    font-size: 1.3rem;
+  }
+
+  .g-lock__key {
+    height: 44px;
+  }
+}
+
+/* ---------- welcome: the first page of the money book ---------- */
+.g-welcome {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 18px;
+  min-height: 100dvh;
+  padding: 36px 16px 40px;
+  overflow-x: clip;
+}
+
+.g-welcome__card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: min(620px, 100%);
+  padding: 26px clamp(18px, 4vw, 40px) 26px;
+  text-align: center;
+  background: var(--surface);
+  border: var(--bw) solid var(--frame);
+  border-radius: 28px;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Two strips of tape pin the card to the page. */
+.g-welcome__card::before,
+.g-welcome__card::after {
+  content: '';
+  position: absolute;
+  top: 12px;
+  width: 96px;
+  height: 26px;
+  background: color-mix(in srgb, var(--butter) 78%, transparent);
+  border: 1.5px dashed rgb(21 21 21 / .28);
+  pointer-events: none;
+}
+
+.g-welcome__card::before {
+  left: -28px;
+  rotate: -38deg;
+}
+
+.g-welcome__card::after {
+  right: -28px;
+  rotate: 38deg;
+}
+
+.g-welcome__logo {
+  width: 112px;
+  height: 112px;
+  margin: -4px 0 -6px;
+  transition: rotate .3s var(--ease-spring);
+}
+
+.g-welcome__logo:hover {
+  rotate: -7deg;
+}
+
+.g-welcome__logo:focus-visible {
+  border-radius: 50%;
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.g-welcome__logo svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.g-welcome__coin {
+  fill: var(--gold);
+  stroke: var(--coal);
+  stroke-width: 3;
+}
+
+.g-welcome__coin-mark {
+  font: 800 15px/1 var(--font-display);
+  fill: var(--coal);
+}
+
+.g-welcome__pot {
+  fill: var(--peach);
+  stroke: var(--coal);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.g-welcome__slot {
+  fill: var(--coal);
+}
+
+.g-welcome__band {
+  fill: none;
+  stroke: var(--coal);
+  stroke-width: 3;
+  opacity: .25;
+}
+
+.g-welcome__title {
+  font: 800 clamp(3.2rem, 2rem + 6vw, 5.4rem)/.9 var(--font-display);
+  letter-spacing: -.055em;
+}
+
+.g-welcome__title > span {
+  color: var(--coral);
+}
+
+.g-welcome__lead {
+  max-width: 44ch;
+  font: 500 clamp(.98rem, .9rem + .3vw, 1.08rem)/1.55 var(--font-body);
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.g-welcome__stickers {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 8px;
+  max-width: 540px;
+  margin: 6px 0 4px;
+}
+
+/* Motion owns the stickers' entrance and tilt here. */
+.g-welcome__stickers .g-sticker {
+  rotate: none;
+  animation: none;
+}
+
+.g-welcome__form {
+  display: grid;
+  gap: 8px;
+  width: min(440px, 100%);
+  margin-top: 8px;
+  text-align: left;
+}
+
+.g-welcome__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.g-welcome__actions .g-btn {
+  flex: 1 1 180px;
+  justify-content: center;
+}
+
+.g-welcome__note {
+  margin-top: 4px;
+  font: 500 .74rem/1.5 var(--font-mono);
+  color: var(--ink-3);
+}
+
+.g-welcome__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  font: 700 .86rem/1 var(--font-display);
+  color: var(--ink-2);
+  border-radius: 10px;
+  transition:
+    color .15s,
+    background-color .15s;
+}
+
+.g-welcome__back:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.g-welcome__back > svg {
+  transition: translate .2s var(--ease-out);
+}
+
+.g-welcome__back:hover > svg {
+  translate: -3px 0;
+}
+
+/* ---------- small screens ---------- */
+@media (max-width: 719px) {
+  .g-toasts {
+    inset: 10px 10px auto;
+    width: auto;
+  }
+
+  .g-receipt {
+    top: 12px;
+  }
+
+  .g-receipt__list {
+    max-height: 56dvh;
+  }
+}

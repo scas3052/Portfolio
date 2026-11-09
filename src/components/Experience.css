@@ -1,0 +1,200 @@
+.experience__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 1.5rem;
+}
+
+.experience__list {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.experience__card {
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+}
+
+.experience__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.15rem;
+}
+
+.experience__logo {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  font-size: 2.4rem;
+  color: #0f6fc6;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.experience__heading {
+  flex: 1;
+  min-width: 200px;
+}
+
+.experience__role {
+  font-size: 1.35rem;
+}
+
+.experience__company {
+  margin-top: 0.2rem;
+  font-weight: 500;
+  color: var(--accent-2);
+}
+
+.experience__period {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-faint);
+}
+
+.experience__type {
+  padding: 0.35rem 0.8rem;
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
+.experience__summary {
+  margin-top: 1.5rem;
+  font-size: 1.02rem;
+  color: var(--text);
+}
+
+.experience__points {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1.25rem;
+}
+
+.experience__points li {
+  display: flex;
+  gap: 0.75rem;
+  color: var(--text-muted);
+}
+
+.experience__points svg {
+  flex-shrink: 0;
+  margin-top: 0.3rem;
+  font-size: 1.05rem;
+  color: var(--success);
+}
+
+.experience__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 1.6rem;
+  padding-top: 1.4rem;
+  border-top: 1px dashed var(--border-strong);
+}
+
+/* Call-to-action card */
+.experience__cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: clamp(1.5rem, 3vw, 2.25rem);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 100% 0%, var(--accent-soft), transparent 60%),
+    radial-gradient(circle at 0% 100%, var(--accent-2-soft), transparent 55%),
+    var(--surface);
+}
+
+/* A light that travels around the card's edge */
+@property --cta-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.experience__cta-border {
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(
+    from var(--cta-angle),
+    transparent 0 60%,
+    var(--accent) 78%,
+    var(--accent-2) 90%,
+    transparent
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  animation: cta-border-spin 6s linear infinite;
+}
+
+@keyframes cta-border-spin {
+  to {
+    --cta-angle: 360deg;
+  }
+}
+
+.experience__cta-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  font-size: 1.5rem;
+  color: #fff;
+  background: var(--gradient);
+  box-shadow: var(--glow);
+}
+
+.experience__cta-icon svg {
+  animation: rocket-hover 3.2s ease-in-out infinite;
+}
+
+@keyframes rocket-hover {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(2px, -3px);
+  }
+}
+
+.experience__cta h3 {
+  font-size: 1.35rem;
+}
+
+.experience__cta p {
+  color: var(--text-muted);
+}
+
+.experience__cta .btn {
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 959px) {
+  .experience__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

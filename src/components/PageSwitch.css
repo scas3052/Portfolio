@@ -1,0 +1,80 @@
+.page-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 44px;
+  padding: 0 0.85rem 0 5px;
+  border-radius: var(--radius-full);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition:
+    border-color 0.25s var(--ease),
+    background-color 0.25s var(--ease),
+    transform 0.25s var(--ease);
+}
+
+.page-switch:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateY(-2px);
+}
+
+.page-switch:focus-visible {
+  border-radius: var(--radius-full);
+}
+
+/* Gullak's lime and coal: a small preview of where the switch leads */
+.page-switch__knob {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 1rem;
+  color: #151515;
+  background: #c8f169;
+  box-shadow: inset 0 0 0 1px rgba(21, 21, 21, 0.14);
+  transition: transform 0.35s var(--ease);
+}
+
+.page-switch:hover .page-switch__knob {
+  transform: rotate(-12deg) scale(1.06);
+}
+
+.page-switch__arrow {
+  font-size: 0.95rem;
+  color: var(--text-faint);
+  transition:
+    color 0.25s var(--ease),
+    transform 0.25s var(--ease);
+}
+
+.page-switch:hover .page-switch__arrow {
+  color: var(--text);
+  transform: translate(2px, -2px);
+}
+
+.page-curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  transform: translateY(101%);
+}
+
+@media (max-width: 559px) {
+  .page-switch {
+    justify-content: center;
+    width: 44px;
+    padding: 0;
+  }
+
+  .page-switch__label,
+  .page-switch__arrow {
+    display: none;
+  }
+}

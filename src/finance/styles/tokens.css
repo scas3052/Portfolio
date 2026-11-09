@@ -1,0 +1,126 @@
+/* Gullak design tokens — "paper" (default) and "ink" themes. */
+:root {
+  --font-display: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+  --font-body: 'Manrope Variable', system-ui, sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --lime: #c8f169;
+  --lilac: #cbb8ff;
+  --peach: #ffbe94;
+  --sky: #a4d8ff;
+  --mint: #a3ebc8;
+  --butter: #ffe174;
+  --rose: #ffb3cb;
+  --tan: #e6cfa7;
+  --coral: #ff8a6b;
+  --teal: #74d6cb;
+  --gray: #dcd6c8;
+  --gold: #f5c542;
+
+  --coal: #151515;
+  --cream: #f2eee3;
+  --on-tone: #151515;
+  --tone: var(--lime);
+
+  --bg: #f2eee3;
+  --dots: rgb(21 21 21 / .13);
+  --frame: #151515;
+  --drop: #151515;
+  --ink: #151515;
+  --ink-2: #4a463e;
+  --ink-3: #777166;
+  --line: #151515;
+  --hair: rgb(21 21 21 / .14);
+  --surface: #fffcf5;
+  --surface-2: #f7f2e5;
+  --field: #fffdf9;
+  --pos: #0b7a45;
+  --neg: #c03a1e;
+  --scrim: rgb(28 24 16 / .42);
+
+  --o: 4px;
+  --shadow: var(--o) var(--o) 0 var(--drop);
+  --shadow-sm: 2px 2px 0 var(--drop);
+  --shadow-lg: 7px 7px 0 var(--drop);
+
+  --bw: 2px;
+  --r-lg: 20px;
+  --r: 14px;
+  --r-sm: 10px;
+  --r-xs: 6px;
+
+  --ease-out: cubic-bezier(.22, .9, .3, 1);
+  --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --ease-in: cubic-bezier(.55, 0, .8, .2);
+  --ease-snap: cubic-bezier(.2, 1.4, .4, 1);
+
+  --side-w: 252px;
+  --tabs-h: 74px;
+
+  color-scheme: light;
+  interpolate-size: allow-keywords;
+}
+
+html[data-fin-theme='ink'] {
+  color-scheme: dark;
+  --bg: #121212;
+  --dots: rgb(242 238 227 / .085);
+  --frame: #ebe5d5;
+  --drop: #ebe5d5;
+  --ink: #f2eee3;
+  --ink-2: #bcb5a5;
+  --ink-3: #8d8778;
+  --line: #ebe5d5;
+  --hair: rgb(242 238 227 / .14);
+  --surface: #1c1b19;
+  --surface-2: #252421;
+  --field: #161615;
+  --pos: #82e3a9;
+  --neg: #ff9578;
+  --scrim: rgb(0 0 0 / .6);
+  --shadow: var(--o) var(--o) 0 var(--drop);
+  --shadow-sm: 2px 2px 0 var(--drop);
+  --shadow-lg: 7px 7px 0 var(--drop);
+}
+
+/*
+ * Pastel "tone" surfaces. They keep the theme's outer frame and drop shadow,
+ * but everything inside them is re-inked for a light fill so nested controls
+ * stay legible in both themes.
+ */
+:is(
+  .g-tile--tone, .g-card__face, .g-deck__card, .g-tree__tile, .g-toast--tone,
+  .g-banner, .g-receipt__paper, .g-sheet__head, .g-upcoming__date,
+  .g-ticket__head, .g-person-preview, .g-goal-preview, .g-loan-preview,
+  .g-contribute__jar, .g-callout, .g-strip__item, .g-owe__side, .g-scale__dish
+) {
+  background-color: var(--tone);
+  color: var(--on-tone);
+  color-scheme: light;
+}
+
+:is(
+  .g-tile--tone, .g-card__face, .g-deck__card, .g-tree__tile, .g-toast--tone,
+  .g-banner, .g-receipt__paper, .g-sheet__head, .g-upcoming__date,
+  .g-ticket__head, .g-person-preview, .g-goal-preview, .g-loan-preview,
+  .g-contribute__jar, .g-callout, .g-strip__item, .g-owe__side, .g-scale__dish
+) > * {
+  --ink: #151515;
+  --ink-2: #3f3b33;
+  --ink-3: #5e594e;
+  --line: #151515;
+  --frame: #151515;
+  --drop: #151515;
+  --hair: rgb(21 21 21 / .16);
+  --surface: #fffcf5;
+  --surface-2: rgb(255 255 255 / .45);
+  --field: #fffdf9;
+  --pos: #08693b;
+  --neg: #b02f15;
+  --tone: var(--surface);
+  --accent: var(--surface);
+  --shadow: var(--o) var(--o) 0 var(--drop);
+  --shadow-sm: 2px 2px 0 var(--drop);
+  --shadow-lg: 7px 7px 0 var(--drop);
+  color-scheme: light;
+}

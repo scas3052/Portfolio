@@ -1,0 +1,76 @@
+.marquee {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  overflow: hidden;
+  padding-block: 1.6rem;
+  border-block: 1px solid var(--border);
+  background: var(--surface);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+.marquee__track {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 55s linear infinite;
+}
+
+/* Second row drifts the other way, a little slower */
+.marquee__track--reverse {
+  animation-duration: 68s;
+  animation-direction: reverse;
+}
+
+.marquee:hover .marquee__track {
+  animation-play-state: paused;
+}
+
+.marquee__row {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: clamp(2.25rem, 4vw, 3.5rem);
+  padding-right: clamp(2.25rem, 4vw, 3.5rem);
+}
+
+.marquee__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-faint);
+  transition: color 0.25s var(--ease);
+}
+
+.marquee__item svg {
+  font-size: 1.5rem;
+  transition:
+    color 0.25s var(--ease),
+    transform 0.35s var(--ease);
+}
+
+.marquee__item:hover {
+  color: var(--text);
+}
+
+.marquee__item:hover svg {
+  color: var(--accent-2);
+  transform: scale(1.15) rotate(-6deg);
+}
+
+@keyframes marquee-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee__track {
+    animation: none;
+  }
+}

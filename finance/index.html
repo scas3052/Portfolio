@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" data-fin-theme="paper">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Gullak</title>
+    <meta name="description" content="Gullak: a private money book for spends, earnings, EMIs, lending and bank balances." />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#f2eee3" />
+    <style>
+      html { background: #f2eee3; }
+      html[data-fin-theme='ink'] { background: #121212; }
+    </style>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23151515'/%3E%3Cpath d='M12 35C12 26 21 22 32 22s20 4 20 13v11c0 8-8 11-20 11s-20-3-20-11z' fill='%23c8f169'/%3E%3Crect x='25' y='27' width='14' height='4' rx='2' fill='%23151515'/%3E%3Cpath d='M12 42h40' stroke='%23151515' stroke-width='2.5'/%3E%3Ccircle cx='32' cy='12' r='7' fill='%23f5c542'/%3E%3C/svg%3E"
+    />
+    <script>
+      ;(function () {
+        try {
+          if (localStorage.getItem('gullak:theme') === 'ink') {
+            document.documentElement.setAttribute('data-fin-theme', 'ink')
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', '#121212')
+          }
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <noscript>
+      <p style="max-width: 32rem; margin: 3rem auto; padding: 1.5rem; font: 500 1rem/1.6 system-ui, sans-serif; border: 2px solid #151515; border-radius: 16px; background: #fffcf5; color: #151515">
+        Gullak needs JavaScript. Everything it stores stays in this browser, so nothing is sent anywhere.
+        <a href="../" style="color: inherit">Back to the portfolio</a>
+      </p>
+    </noscript>
+    <div id="gullak-root"></div>
+    <script type="module" src="/src/finance/main.jsx"></script>
+  </body>
+</html>

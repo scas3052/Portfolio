@@ -1,0 +1,134 @@
+.skills__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.skills__grid > li {
+  display: flex;
+}
+
+.skills__card {
+  width: 100%;
+  padding: 1.85rem;
+}
+
+.skills__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1.6rem;
+}
+
+.skills__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  font-size: 1.55rem;
+  color: #fff;
+  background: var(--gradient);
+  box-shadow: var(--glow);
+  transition: transform 0.5s var(--ease);
+}
+
+.skills__card:hover .skills__icon {
+  transform: rotate(-8deg) scale(1.06);
+}
+
+.skills__heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.skills__heading h3 {
+  font-size: 1.25rem;
+}
+
+.skills__heading p {
+  margin-top: 0.25rem;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+.skills__count {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-faint);
+}
+
+.skills__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+/* Motion drives the chip transforms, so keep CSS transitions off `transform` */
+.chip.skills__chip {
+  transition:
+    border-color 0.25s var(--ease),
+    background-color 0.25s var(--ease);
+}
+
+.skills__chip:hover {
+  border-color: var(--chip-color, var(--border-strong));
+  background: color-mix(in srgb, var(--chip-color, var(--text)) 10%, transparent);
+}
+
+.skills__chip-icon {
+  font-size: 1.05rem;
+  color: var(--chip-color, var(--text));
+}
+
+/* Core concepts strip */
+.skills__concepts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.75rem;
+  margin-top: 1.75rem;
+  padding: 1.35rem 1.75rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+}
+
+.skills__concepts-label {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.skills__concepts-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.5rem;
+}
+
+.skills__concepts-list li {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.skills__concepts-list span {
+  margin-right: 0.3rem;
+  font-family: var(--font-mono);
+  color: var(--accent-2);
+}
+
+@media (max-width: 859px) {
+  .skills__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .skills__card {
+    padding: 1.5rem 1.25rem;
+  }
+}
