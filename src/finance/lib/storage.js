@@ -4,12 +4,13 @@ export const DATA_KEY = 'gullak:v1'
 export const THEME_KEY = 'gullak:theme'
 export const THEME_COLORS = { paper: '#f2eee3', ink: '#121212' }
 
-export function loadState() {
+/** The saved book, plus the exact text it was read from (null when there was none). */
+export function loadSaved() {
   try {
     const raw = window.localStorage.getItem(DATA_KEY)
-    return raw ? normalizeState(JSON.parse(raw)) : emptyState()
+    return raw ? { state: normalizeState(JSON.parse(raw)), raw } : { state: emptyState(), raw: null }
   } catch {
-    return emptyState()
+    return { state: emptyState(), raw: null }
   }
 }
 

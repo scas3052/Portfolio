@@ -113,16 +113,22 @@ export function Segmented({ options, value, onChange, label, size, className }) 
 }
 
 /** Destructive actions need a press-and-hold instead of a second dialog. */
-export function HoldButton({ onConfirm, children, tone = 'coral', duration = 1200, icon: Icon, className }) {
+export function HoldButton({ onConfirm, children, tone = 'coral', duration = 1200, icon: Icon, className, disabled = false }) {
   const [holding, setHolding] = useState(false)
   const timer = useRef(0)
+  if (disabled && holding) setHolding(false)
 
   useEffect(() => {
     const pending = timer
     return () => clearTimeout(pending.current)
   }, [])
 
+  useEffect(() => {
+    if (disabled) clearTimeout(timer.current)
+  }, [disabled])
+
   const start = () => {
+    if (disabled) return
     clearTimeout(timer.current)
     setHolding(true)
     timer.current = setTimeout(() => {
@@ -140,6 +146,7 @@ export function HoldButton({ onConfirm, children, tone = 'coral', duration = 120
       type="button"
       className={cx('g-hold', holding && 'is-holding', className)}
       style={{ ...toneVar(tone), '--hold': `${duration}ms` }}
+      disabled={disabled}
       onPointerDown={(event) => {
         if (event.button === 0) start()
       }}

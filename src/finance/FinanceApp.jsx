@@ -11,6 +11,7 @@ import { isTypingTarget, useKeydown } from './hooks/useKeydown'
 import { useToday } from './hooks/useToday'
 import { addMonths } from './lib/dates'
 import { navigate, useHashRoute, viewMeta, VIEWS } from './lib/router'
+import CloudProvider from './store/CloudProvider'
 import { useFinance, useUi } from './store/contexts'
 import FinanceProvider from './store/FinanceProvider'
 import UiProvider from './store/UiProvider'
@@ -182,13 +183,18 @@ function Gate() {
   )
 }
 
-/** Gullak: a private money book that lives entirely in this browser. */
+/**
+ * Gullak: a private money book kept in this browser, and optionally synced through the owner's
+ * Google account so it follows them to other browsers and devices.
+ */
 export default function FinanceApp() {
   const today = useToday()
   return (
     <FinanceProvider today={today}>
       <UiProvider>
-        <Gate />
+        <CloudProvider>
+          <Gate />
+        </CloudProvider>
       </UiProvider>
     </FinanceProvider>
   )

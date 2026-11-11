@@ -26,7 +26,7 @@ const TIPS = [
   { title: 'Swipe an entry left', body: 'Drag any entry to the left to delete it. Undo is one tap away.' },
   { title: 'Keyboard first', body: 'N logs a spend, I logs income, H hides amounts and 1–8 switch pages.' },
   { title: 'Hide your numbers', body: 'Tap the eye (or press H) before you show your screen to someone.' },
-  { title: 'Back up your book', body: 'Everything lives in this browser only. Export a JSON backup from Settings now and then.' },
+  { title: 'Back up your book', body: 'A JSON backup from Settings restores your whole book on any device. Download one now and then.' },
   { title: 'Flip the cards', body: 'Tap an account card to flip it and see that account’s money in and out this month.' },
 ]
 

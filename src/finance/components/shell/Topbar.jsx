@@ -5,6 +5,7 @@ import { currentHour, formatDay, greeting } from '../../lib/dates'
 import { MOD_KEY } from '../../lib/dom'
 import { viewMeta } from '../../lib/router'
 import { useFinance, useUi } from '../../store/contexts'
+import SyncBadge from '../cloud/SyncBadge'
 import Brand from './Brand'
 import MonthSwitcher from './MonthSwitcher'
 
@@ -54,6 +55,7 @@ export default function Topbar({ view }) {
             {MOD_KEY} K
           </kbd>
         </button>
+        <SyncBadge />
         <button
           type="button"
           className="g-icon-btn g-press"

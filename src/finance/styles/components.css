@@ -478,6 +478,11 @@ html[data-fin-theme='ink'] .g-chip--tone {
   transition: transform var(--hold, 1200ms) linear;
 }
 
+.g-hold:disabled {
+  opacity: .45;
+  box-shadow: none;
+}
+
 /* ---------- switch ---------- */
 .g-switch {
   position: relative;

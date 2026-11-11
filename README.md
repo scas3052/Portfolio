@@ -2,7 +2,7 @@
 
 A modern, responsive and animated personal portfolio built with **React 19** and **Vite**.
 
-The same project also holds **Gullak**, a private personal-finance book on its own page (`/finance/`) with a completely different look. See [Gullak — personal finance page](#gullak--personal-finance-page). Gullak has its own AI assistant, **Munshi**, which answers questions about your money and turns plain sentences like "spent 250 on lunch" into entries you confirm. See [Munshi — Gullak's AI assistant](#munshi--gullaks-ai-assistant).
+The same project also holds **Gullak**, a private personal-finance book on its own page (`/finance/`) with a completely different look. See [Gullak — personal finance page](#gullak--personal-finance-page). Gullak has its own AI assistant, **Munshi**, which answers questions about your money and turns plain sentences like "spent 250 on lunch" into entries you confirm. See [Munshi — Gullak's AI assistant](#munshi--gullaks-ai-assistant). The book can also sync across all your browsers and devices through a free Firebase project. See [Cloud sync (Firebase)](#cloud-sync-firebase).
 
 ## Features
 
@@ -25,6 +25,7 @@ The same project also holds **Gullak**, a private personal-finance book on its o
 | Icons     | react-icons (Lucide, Simple Icons, Font Awesome)         |
 | Fonts     | Portfolio: Inter, Space Grotesk and JetBrains Mono. Gullak: Bricolage Grotesque, Manrope and Geist Mono (all self-hosted via Fontsource) |
 | AI assistant | Free LLM APIs (Groq, OpenRouter, Cerebras, NVIDIA, Mistral, Hugging Face, Gemini) behind a small serverless relay: Vercel or Netlify Functions in production, a Vite plugin in dev and preview |
+| Cloud sync | Firebase on the free Spark plan: Authentication (Google sign-in) and Cloud Firestore, loaded only once sync is used |
 | Quality   | ESLint (React Hooks + React Refresh rules), Node's built-in test runner |
 
 ## Getting started
@@ -37,10 +38,10 @@ npm run dev       # start the dev server at http://localhost:5173 (Gullak is at 
 npm run build     # production build into dist/
 npm run preview   # preview the production build locally
 npm run lint      # lint the source
-npm test          # run Munshi's unit tests
+npm test          # run the unit tests (Munshi and cloud sync)
 ```
 
-Munshi, Gullak's assistant, needs a passphrase and at least one free AI key in `.env.local`. Everything else works without them. See [Set it up locally](#set-it-up-locally).
+Munshi, Gullak's assistant, needs a passphrase and at least one free AI key in `.env.local`. Everything else works without them. See [Set it up locally](#set-it-up-locally). Cloud sync is optional too: it only appears once the `VITE_FIREBASE_*` variables are set. See [Cloud sync (Firebase)](#cloud-sync-firebase).
 
 ## Editing your content
 
@@ -86,11 +87,12 @@ Every money movement is one of eight entry types: spend, income, transfer betwee
 | EMIs & loans | Each loan as a punch card with EMIs paid, amount left and interest, plus how the monthly EMI total drops over the next 12 months |
 | People       | Who owes you and who you owe on a tilting balance scale, with one-tap settle up and a friendly reminder you can share |
 | Plan         | Monthly category budgets with how much is safe to spend each day, and savings goals as jars you add money to   |
-| Settings     | Name, theme, PIN, Munshi (the AI assistant), backup and restore, CSV export, sample data and erase              |
+| Settings     | Name, theme, PIN, backup and restore, CSV export, sync across devices, Munshi (the AI assistant), sample data and erase |
 
 Also included:
 
 - **Munshi, an AI assistant** that answers questions about your money and drafts entries from plain sentences, saving nothing until you confirm. See [Munshi — Gullak's AI assistant](#munshi--gullaks-ai-assistant).
+- **Optional sync across devices:** sign in with Google and the same book shows up in every browser and on every device, kept in your own free Firebase project that only your account can open. See [Cloud sync (Firebase)](#cloud-sync-firebase).
 - **Amount boxes are calculators:** type `240+65` or `1200/4` and Gullak works it out.
 - **Command palette** to search entries and run any action.
 - **Privacy mode** hides every amount, for using it in public.
@@ -101,9 +103,11 @@ Also included:
 
 ### Your data
 
-Everything is saved only in this browser's `localStorage` (key `gullak:v1`). Nothing leaves the browser unless Munshi asks the AI something for you (see [what Munshi sends](#privacy)), and every visitor gets their own empty book, so publishing the page never exposes your entries. Clearing site data or switching browser or device starts fresh, so download a JSON backup from **Settings → Backup** now and then; it restores on any device. Entries can also be exported as CSV for Excel or Google Sheets.
+Your book is saved in this browser's `localStorage` (key `gullak:v1`), so Gullak opens instantly and works offline. Nothing leaves the browser unless Munshi asks the AI something for you (see [what Munshi sends](#privacy)) or you turn on sync, and every visitor gets their own empty book, so publishing the page never exposes your entries.
 
-The PIN is a privacy curtain, not encryption: it hides the screen, but the data stored in the browser is not encrypted.
+To see the same book in another browser or on another device, turn on [cloud sync](#cloud-sync-firebase). Without it, clearing site data or switching browser or device starts fresh. Either way, download a JSON backup from **Settings → Backup** now and then; it restores on any device. Entries can also be exported as CSV for Excel or Google Sheets.
+
+The PIN is a privacy curtain, not encryption: it hides the screen, but the data stored in the browser is not encrypted. With sync on, the PIN travels with the book, so every synced device asks for it.
 
 ### Keyboard shortcuts
 
@@ -125,6 +129,78 @@ In a form, `Enter` saves, `Ctrl`/`⌘` + `Enter` saves and starts another entry,
 ### Turning it off
 
 Set `FINANCE_ENABLED = false` in [`src/config.js`](src/config.js). The navbar switch disappears, Gullak is left out of the production build and the dev server stops serving Munshi's relay. The Vercel and Netlify relay functions still deploy with the site, but they refuse every request until `AGENT_PASSPHRASE` and a provider key are set, so leave those unset.
+
+## Cloud sync (Firebase)
+
+Gullak can keep one book across every browser and device you use. You sign in with Google, and the book is mirrored to Cloud Firestore in your own Firebase project on the free **Spark** plan, which is plenty for one person's money book. Sync is optional. Until the project's settings are in the build there's no sign-in button anywhere and Gullak works exactly as before, and the Firebase code only downloads for someone who actually uses sync.
+
+### How sync works
+
+- **Each browser keeps a working copy.** Gullak still reads and writes `localStorage`, so it opens instantly and works offline. Every change is sent to the cloud in the background. Changes made offline wait on the device, even if you close the tab, and go up once you're back online.
+- **Other devices update live.** An entry added on your phone shows up on your laptop within seconds. If two devices change the same thing, the change that reaches the cloud last wins.
+- **Only you get in.** The Firestore rules let in only the Google account you list in them. Anyone else who signs in on your site is told sync is private, signed out again, and nothing on their device changes.
+- **Turning it on:** open **Settings → Sync → Turn on sync** (or **Sign in to sync** on the welcome screen, or the cloud badge in the top bar) and press **Continue with Google**. What happens next depends on where your entries are:
+  - If the cloud is empty, this device's book is uploaded.
+  - If this device is empty, the cloud book comes down.
+  - If both have entries, you choose: **Use the cloud book**, **Merge both**, or press and hold **Replace the cloud book** to give every device this one's book. You can download a backup of either book first.
+- **What syncs:** entries, accounts, loans, people, goals, budgets, your name and the PIN. Hiding amounts, the paper or ink theme, and Munshi's settings and chat stay on each device.
+- **Signing out:** **Settings → Sync → Sign out of this device** keeps the book in the cloud and removes it from this browser, along with Munshi's chat. If some changes haven't reached the cloud yet, Gullak waits a few seconds for them and asks before anything is lost.
+- **Forgot the PIN on a synced device?** The PIN syncs, so it can't be reset from one device alone. Choose **Forgot PIN?** on the lock screen, then **Confirm with Google** to remove the PIN on every device, or press and hold **Remove from this device** to take the book off just this one.
+- **Restoring a backup, loading the sample data and erasing everything** on a synced device also change the cloud and every other synced device. Gullak says so before you confirm.
+- **The status** shows as a cloud badge in the top bar and in **Settings → Sync**, with the account, when it last synced, how many changes are waiting, and a button for whatever needs fixing.
+
+### Set up sync
+
+1. **Create a Firebase project** at [console.firebase.google.com](https://console.firebase.google.com). Google Analytics isn't needed. New projects start on the free Spark plan, so no billing account is involved.
+2. **Register a web app:** in **Project settings → General → Your apps**, add a **Web** app (`</>`). Firebase Hosting isn't needed. Keep the `firebaseConfig` values it shows; you can find them there again later.
+3. **Turn on Google sign-in:** in **Authentication → Sign-in method**, add **Google**, enable it, pick a support email and save. Then in **Authentication → Settings → Authorized domains**, add the domain your site runs on (for example `your-site.netlify.app` or your own domain). `localhost` is already there for development.
+4. **Create the database:** in **Firestore Database**, choose **Create database**. Pick the **Standard** edition if asked, a location near you (it can't be changed later) and **production mode**.
+5. **Deploy the security rules** with the Firebase CLI:
+
+   ```bash
+   cp firestore.rules.example firestore.rules   # then put your Google email, in lower case, in owners()
+   npx firebase-tools login
+   npx firebase-tools deploy --only firestore --project your-project-id
+   ```
+
+   Your `firestore.rules` copy is git-ignored, so your email stays out of the repository. The same command deploys [`firestore.indexes.json`](firestore.indexes.json), which switches off search indexes that sync never uses so writes stay small. Until the rules are deployed, production mode refuses every request.
+6. **Give the site the project's settings.** For development, put the values from step 2 in `.env.local` (see [`.env.example`](.env.example)):
+
+   ```ini
+   VITE_FIREBASE_API_KEY=...
+   VITE_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your-project-id
+   VITE_FIREBASE_APP_ID=...
+   ```
+
+   For the live site, add the same variables in Netlify (**Site configuration → Environment variables**) or Vercel (**Project → Settings → Environment Variables**) and redeploy. Vite builds them into the page, so a change only takes effect after the next build. They aren't secrets: they only name your project, and the rules from step 5 decide who gets in.
+7. **Turn it on, once per device:** open Gullak, go to **Settings → Sync → Turn on sync** and press **Continue with Google**. Do the same on each browser and device you use.
+
+If sign-in fails, Gullak says why. The usual causes are a blocked popup, a site domain missing from **Authorized domains** (step 3), or Google sign-in not being enabled.
+
+### Spark plan limits
+
+The Spark plan never bills you. If a daily limit runs out, Firebase refuses requests until it resets around midnight Pacific time. Gullak then shows **Daily limit reached**, keeps working on each device, and sends the waiting changes after the reset.
+
+| Spark plan allows         | How Gullak uses it                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 50,000 reads a day        | Opening Gullak reads the whole book once: one document for accounts, loans, people, goals, budgets and settings, plus one per month of entries. Live updates then read only what changed |
+| 20,000 writes a day       | About one per change                                                                                    |
+| 1 GiB stored              | Years of entries take a few megabytes. Each month of entries is one document, and Firestore's 1 MiB per document leaves room for a few thousand entries a month |
+| 10 GiB downloaded a month | Each open downloads the book once                                                                       |
+
+### Who can see your book
+
+- Only the Google account(s) listed in `firestore.rules` can read or write the cloud book, and each one only reaches its own folder (`users/<uid>/book`). Visitors who never sign in never talk to Firebase.
+- Google encrypts Firestore data at rest, but it isn't end-to-end encrypted: whoever manages the Firebase project can read the book in the Firebase console. Keep the project in your own Google account.
+- The PIN syncs as the same hash Gullak keeps in the browser, never as the digits. It's still a privacy curtain, not encryption.
+- Firebase remembers the sign-in in the browser so sync keeps working. On a device you don't own, sign out when you're done.
+
+### Turning sync off
+
+- **On one device:** **Settings → Sync → Sign out of this device**. The book stays in the cloud for your other devices.
+- **For the whole site:** remove the `VITE_FIREBASE_*` variables and redeploy. The sign-in button disappears. Devices that were syncing show **Sync unavailable** but keep their book and any changes that hadn't reached the cloud yet, and those go up if you add the variables back. Signing out from that state removes the book from the device, so download a backup first.
+- **To delete the cloud copy:** use **Settings → Danger zone → Erase everything** on a synced device, which empties the book everywhere, or delete the Firebase project.
 
 ## Munshi — Gullak's AI assistant
 
@@ -205,7 +281,7 @@ In **Settings → Munshi → AI provider** you can pin one provider. It is tried
 
 ### Tests
 
-`npm test` runs Munshi's unit tests in [`tests/`](tests) with Node's built-in test runner (Node 22.15+). They cover quick add, name matching, building and saving drafts, undo, the chat loop and the relay client. Everything is mocked, so they need no keys or network.
+`npm test` runs the unit tests in [`tests/`](tests) with Node's built-in test runner (Node 22.15+). Munshi's (`tests/agent/`) cover quick add, name matching, building and saving drafts, undo, the chat loop and the relay client. The [cloud sync](#cloud-sync-firebase) tests (`tests/cloud/`, `tests/store/`) cover how the book is split into documents, merging, the offline queue, live updates, linking, signing out and the forgotten-PIN flow, against an in-memory stand-in for Firestore. Everything is mocked, so they need no keys, Firebase project or network.
 
 ## Project structure
 
@@ -215,8 +291,11 @@ finance/index.html      Gullak's page (served at /finance/)
 server/                 Munshi's relay (agentRelay.js), its provider list (providers.js) and the Vite dev/preview plugin
 api/agent.js            the relay as a Vercel Function
 netlify/functions/      the relay as a Netlify Function (netlify.toml holds the build settings)
-tests/                  Munshi's unit tests (npm test)
-.env.example            relay settings template (copy it to .env.local)
+tests/                  unit tests for Munshi and cloud sync (npm test)
+.env.example            settings template for the relay and cloud sync (copy it to .env.local)
+firebase.json           Firebase CLI config for deploying the Firestore rules and indexes
+firestore.rules.example cloud sync security rules (copy to firestore.rules and add your email)
+firestore.indexes.json  turns off Firestore indexes that sync doesn't need
 src/
   components/           one component per section (each with its own .css), plus the navbar Finance switch
   data/portfolio.js     all site content
@@ -232,8 +311,9 @@ src/
     main.jsx            Gullak's entry point
     views/              the eight sections
     agent/              Munshi: chat loop, tools, prompt, quick add, drafts and saving, relay client
-    components/         cards, charts, forms, overlays (sheets, palette, lock screen, toasts), the shell (sidebar, top bar, tab bar) and Munshi's panel (agent/)
-    store/              FinanceProvider + reducer (your data), UiProvider (sheets, toasts, theme, privacy, lock)
+    cloud/              cloud sync: Firebase loader, document layout, merging, offline queue, sync engine and sign-in/out
+    components/         cards, charts, forms, overlays (sheets, palette, lock screen, toasts), the shell (sidebar, top bar, tab bar), Munshi's panel (agent/) and the sync screens (cloud/)
+    store/              FinanceProvider + reducer + bookStore (your data), CloudProvider (sync), UiProvider (sheets, toasts, theme, privacy, lock)
     lib/                money maths, selectors, insights, dates, storage, backup and CSV, PIN
     hooks/              small shared hooks
     styles/             Gullak's design tokens and styles (agent.css is Munshi's)
@@ -245,3 +325,4 @@ src/
 
 - **Vercel / Netlify:** import the repository. Build command `npm run build`, output directory `dist` (`netlify.toml` already sets these for Netlify). To turn on Munshi, add its environment variables (see [Deploy the relay](#deploy-the-relay)). Without them `/api/agent` stays off and everything else works as usual.
 - **GitHub Pages:** run `npm run build` and publish the `dist/` folder, for example with the [`gh-pages`](https://www.npmjs.com/package/gh-pages) package (`npx gh-pages -d dist`) or a GitHub Actions Pages workflow. GitHub Pages can't run Munshi's relay, so host the relay on Vercel or Netlify (see [Deploy the relay](#deploy-the-relay)).
+- **Cloud sync** works on any of these hosts. Set the `VITE_FIREBASE_*` variables where the site is built (the host's environment variables, or `.env.local` when building yourself), and add the site's domain to Firebase's **Authorized domains**. See [Set up sync](#set-up-sync).

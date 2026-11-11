@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { LuKeyRound, LuShieldOff } from 'react-icons/lu'
 import { cx } from '../../lib/cx'
 import { checkPin, hashPin, PIN_LENGTH } from '../../lib/pin'
-import { useFinance, useUi } from '../../store/contexts'
+import { useCloud, useFinance, useUi } from '../../store/contexts'
 import { Segmented } from '../bits'
 
 const MODES = [
@@ -56,6 +56,7 @@ function PinCells({ id, value, onChange, onComplete, wrong, describedBy }) {
 export default function PinForm({ onDone }) {
   const { state, dispatch } = useFinance()
   const ui = useUi()
+  const { linked } = useCloud()
   const pinHash = state.settings.pinHash
   const hasPin = Boolean(pinHash)
   const id = useId()
@@ -153,10 +154,17 @@ export default function PinForm({ onDone }) {
         )}
       </div>
 
-      <p className="g-callout">
-        The PIN hides Gullak from people using this device. It isn’t encryption: your data stays in this browser’s
-        storage. Gullak also locks itself after 2 minutes in the background.
-      </p>
+      {linked ? (
+        <p className="g-callout">
+          The PIN syncs, so it’s the same on every device that signs in with your Google account. It hides Gullak from
+          people using a device, but it isn’t encryption. Gullak also locks itself after 2 minutes in the background.
+        </p>
+      ) : (
+        <p className="g-callout">
+          The PIN hides Gullak from people using this device. It isn’t encryption: your data stays in this browser’s
+          storage. Gullak also locks itself after 2 minutes in the background.
+        </p>
+      )}
 
       <div className="g-form__actions">
         <button type="button" className="g-btn g-btn--ghost g-press" onClick={onDone}>

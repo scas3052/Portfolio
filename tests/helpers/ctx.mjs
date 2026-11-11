@@ -32,7 +32,7 @@ export function makeCtx({ today = TODAY, state = buildSample(today), privacy = f
   return ctx
 }
 
-function memoryStorage() {
+export function memoryStorage() {
   const map = new Map()
   return {
     getItem: (key) => (map.has(key) ? map.get(key) : null),

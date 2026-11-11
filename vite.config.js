@@ -13,6 +13,9 @@ export default defineConfig({
   // agentRelay serves Gullak's assistant endpoint (/api/agent) in dev and preview.
   plugins: [react(), ...(FINANCE_ENABLED ? [agentRelay()] : [])],
   build: {
+    // Firebase (Gullak's optional cloud sync) is a single ~560 kB chunk, but it is only fetched
+    // with import() once someone uses sync, so it never weighs on the first load.
+    chunkSizeWarningLimit: 600,
     rolldownOptions: {
       // Two pages: the portfolio, and Gullak (personal finance) at /finance/.
       input: {

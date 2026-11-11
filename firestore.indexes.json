@@ -1,0 +1,13 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    { "collectionGroup": "book", "fieldPath": "items", "indexes": [] },
+    { "collectionGroup": "book", "fieldPath": "accounts", "indexes": [] },
+    { "collectionGroup": "book", "fieldPath": "loans", "indexes": [] },
+    { "collectionGroup": "book", "fieldPath": "people", "indexes": [] },
+    { "collectionGroup": "book", "fieldPath": "goals", "indexes": [] },
+    { "collectionGroup": "book", "fieldPath": "budgets", "indexes": [] },
+    { "collectionGroup": "book", "fieldPath": "settings", "indexes": [] },
+    { "collectionGroup": "book", "fieldPath": "meta", "indexes": [] }
+  ]
+}

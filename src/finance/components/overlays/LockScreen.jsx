@@ -4,8 +4,9 @@ import { LuDelete, LuKeyRound, LuX } from 'react-icons/lu'
 import { useKeydown } from '../../hooks/useKeydown'
 import { cx } from '../../lib/cx'
 import { checkPin, PIN_LENGTH } from '../../lib/pin'
-import { useFinance, useUi } from '../../store/contexts'
+import { useCloud, useFinance, useUi } from '../../store/contexts'
 import { HoldButton } from '../bits'
+import CloudForgot from '../cloud/CloudForgot'
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back']
 const TICKS = Array.from({ length: 40 }, (_, i) => i)
@@ -15,6 +16,7 @@ const DOOR = { duration: 0.62, ease: [0.76, 0, 0.24, 1] }
 export default function LockScreen() {
   const { state, dispatch } = useFinance()
   const { unlock } = useUi()
+  const { linked } = useCloud()
   const [pin, setPin] = useState('')
   const [status, setStatus] = useState('idle')
   const [forgot, setForgot] = useState(false)
@@ -107,7 +109,10 @@ export default function LockScreen() {
           {status === 'wrong' ? 'Wrong PIN, try again.' : status === 'ok' ? 'Unlocked.' : `${pin.length} of ${PIN_LENGTH} digits entered`}
         </p>
 
-        {forgot ? (
+        {forgot && linked ? (
+          // Erasing here would sync an empty book to every device, so a syncing device asks Google instead.
+          <CloudForgot onCancel={() => setForgot(false)} />
+        ) : forgot ? (
           <div className="g-lock__forgot">
             <p>
               The PIN only hides Gullak on this browser, so it can’t be recovered. To start over, hold the button: it

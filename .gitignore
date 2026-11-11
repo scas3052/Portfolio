@@ -19,6 +19,11 @@ dist-ssr
 .vercel
 .netlify
 
+# Firebase: your rules name your email (copy firestore.rules.example), plus CLI state
+firestore.rules
+.firebaserc
+.firebase/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -4,6 +4,7 @@ import {
   LuArrowLeft,
   LuCalculator,
   LuChartColumnBig,
+  LuCloud,
   LuCommand,
   LuHandCoins,
   LuLandmark,
@@ -15,7 +16,7 @@ import {
 import { useActions } from '../../hooks/useActions'
 import { toneVar } from '../../lib/cx'
 import { uid } from '../../lib/id'
-import { useFinance } from '../../store/contexts'
+import { useCloud, useFinance, useUi } from '../../store/contexts'
 
 const FEATURES = [
   { icon: LuWalletCards, label: 'Every bank, card & wallet', tone: 'butter', rotate: -4 },
@@ -66,6 +67,8 @@ function CoinLogo({ drops, onDrop }) {
 export default function Welcome() {
   const { state, dispatch, today } = useFinance()
   const { goPortfolio } = useActions()
+  const { openSheet } = useUi()
+  const cloud = useCloud()
   const [name, setName] = useState(state.settings.name || 'Gopichand')
   const [drops, setDrops] = useState(0)
   const nameId = useId()
@@ -142,9 +145,22 @@ export default function Welcome() {
               <LuSparkles aria-hidden="true" /> Explore with sample data
             </button>
           </div>
+          {cloud.available && !cloud.linked && (
+            <button type="button" className="g-welcome__sync g-press" onClick={() => openSheet('cloudSignIn')}>
+              <LuCloud aria-hidden="true" />
+              <span>
+                Already use Gullak on another device? <strong>Sign in to sync</strong>
+              </span>
+            </button>
+          )}
           <p className="g-welcome__note">
-            Everything stays in this browser (localStorage). Nothing is uploaded unless you ask the Munshi assistant a
-            question. Sample data can be wiped from the banner later.
+            {cloud.linked
+              ? `Your book syncs with ${cloud.email || 'your Google account'}, so it’s the same on every device you sign in on.`
+              : cloud.available
+                ? 'Everything stays in this browser (localStorage) until you turn on sync.'
+                : 'Everything stays in this browser (localStorage).'}{' '}
+            Nothing else is uploaded unless you ask the Munshi assistant a question. Sample data can be wiped from the
+            banner later.
           </p>
         </form>
       </motion.div>
