@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { LuTrash2 } from 'react-icons/lu'
 import { evaluate } from '../../lib/calc'
-import { ACCOUNT_KINDS, KIND_ICONS, TONES } from '../../lib/categories'
+import { nextTone } from '../../agent/commit'
+import { ACCOUNT_KINDS, KIND_ICONS } from '../../lib/categories'
 import { formatINR, round2 } from '../../lib/format'
 import { uid } from '../../lib/id'
 import { useFinance, useUi } from '../../store/contexts'
@@ -33,19 +34,20 @@ function validate(draft) {
   return errors
 }
 
-/** Add or edit a bank account, wallet, cash pocket or credit card. */
-export default function AccountForm({ account, onDone }) {
+/** Add or edit a bank account, wallet, cash pocket or credit card. `prefill` seeds a new one. */
+export default function AccountForm({ account, prefill, onDone, onSaved }) {
   const { state, dispatch, derived } = useFinance()
   const ui = useUi()
   const form = useRef(null)
-  const current = account ? (derived.balances.get(account.id) ?? account.opening) : 0
+  const seed = account || prefill
+  const current = account ? (derived.balances.get(account.id) ?? account.opening) : Number(prefill?.opening) || 0
   const [draft, setDraft] = useState(() => ({
-    name: account?.name || '',
-    kind: account?.kind || 'savings',
-    bank: account?.bank || '',
-    last4: account?.last4 || '',
-    balance: account ? String(account.kind === 'credit' ? round2(-current) : current) : '',
-    color: account?.color || TONES[(state.accounts.length * 3 + 5) % TONES.length],
+    name: seed?.name || '',
+    kind: seed?.kind || 'savings',
+    bank: seed?.bank || '',
+    last4: seed?.last4 || '',
+    balance: account || current ? String(seed.kind === 'credit' ? round2(-current) : current) : '',
+    color: account?.color || nextTone('account', state),
   }))
   const [tried, setTried] = useState(false)
   const errors = tried ? validate(draft) : {}
@@ -77,6 +79,7 @@ export default function AccountForm({ account, onDone }) {
     }
     dispatch({ type: account ? 'account/update' : 'account/add', account: record })
     ui.toast(account ? `${record.name} updated` : `${record.name} added`, { tone: 'butter' })
+    onSaved?.(record)
     onDone()
   }
 

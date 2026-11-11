@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { LuTarget, LuTrash2 } from 'react-icons/lu'
+import { nextTone } from '../../agent/commit'
 import { evaluate } from '../../lib/calc'
-import { TONES } from '../../lib/categories'
 import { toneVar } from '../../lib/cx'
 import { isMonth, monthLabel, monthOf } from '../../lib/dates'
 import { plural, round2 } from '../../lib/format'
@@ -33,19 +33,22 @@ function validate(draft, currentMonth) {
   return errors
 }
 
-/** A savings jar with a target and an optional deadline. */
-export default function GoalForm({ goal, onDone }) {
+/** A savings jar with a target and an optional deadline. `prefill` seeds a new one. */
+export default function GoalForm({ goal, prefill, onDone, onSaved }) {
   const { state, dispatch, today } = useFinance()
   const ui = useUi()
   const form = useRef(null)
   const currentMonth = monthOf(today)
-  const [draft, setDraft] = useState(() => ({
-    name: goal?.name || '',
-    target: goal ? String(goal.target) : '',
-    saved: goal?.saved ? String(goal.saved) : '',
-    deadline: goal?.deadline || '',
-    color: goal?.color || TONES[(state.goals.length * 2 + 3) % TONES.length],
-  }))
+  const [draft, setDraft] = useState(() => {
+    const seed = goal || prefill || {}
+    return {
+      name: seed.name || '',
+      target: seed.target ? String(seed.target) : '',
+      saved: seed.saved ? String(seed.saved) : '',
+      deadline: seed.deadline || '',
+      color: goal?.color || nextTone('goal', state),
+    }
+  })
   const [tried, setTried] = useState(false)
   const errors = tried ? validate(draft, currentMonth) : {}
   const set = (patch) => setDraft((value) => ({ ...value, ...patch }))
@@ -73,6 +76,7 @@ export default function GoalForm({ goal, onDone }) {
     const reached = record.saved >= record.target && !(goal && goal.saved >= goal.target)
     if (reached) ui.celebrate('goal', record.name)
     ui.toast(goal ? `${record.name} updated` : `${record.name} jar is ready`, { tone: 'sky' })
+    onSaved?.(record)
     onDone()
   }
 

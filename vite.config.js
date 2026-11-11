@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import agentRelay from './server/viteAgentPlugin.js'
 import { FINANCE_ENABLED } from './src/config.js'
 
 const page = (path) => fileURLToPath(new URL(path, import.meta.url))
@@ -9,7 +10,8 @@ const page = (path) => fileURLToPath(new URL(path, import.meta.url))
 export default defineConfig({
   // Relative base so the build works on any static host or sub-path (e.g. GitHub Pages).
   base: './',
-  plugins: [react()],
+  // agentRelay serves Gullak's assistant endpoint (/api/agent) in dev and preview.
+  plugins: [react(), ...(FINANCE_ENABLED ? [agentRelay()] : [])],
   build: {
     rolldownOptions: {
       // Two pages: the portfolio, and Gullak (personal finance) at /finance/.

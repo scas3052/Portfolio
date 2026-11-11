@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { LuHistory, LuLandmark, LuPlus, LuTrash2, LuUserPlus, LuWalletCards } from 'react-icons/lu'
+import { commitEntry } from '../../agent/commit'
 import { useActions } from '../../hooks/useActions'
 import { evaluate } from '../../lib/calc'
 import {
@@ -16,8 +17,7 @@ import { cx, toneFor, toneVar } from '../../lib/cx'
 import { isISODate } from '../../lib/dates'
 import { MOD_KEY } from '../../lib/dom'
 import { formatINR, plural, round2 } from '../../lib/format'
-import { stamp, uid } from '../../lib/id'
-import { frequentEntries, PERSON_SIGN } from '../../lib/selectors'
+import { frequentEntries, recentAccountId } from '../../lib/selectors'
 import { useFinance, useUi } from '../../store/contexts'
 import { Avatar, Segmented, Sticker } from '../bits'
 import { Money } from '../Money'
@@ -77,20 +77,14 @@ function fitCategory(type, category) {
   return ''
 }
 
-function lastAccount(sorted, accounts, types) {
-  const ids = new Set(accounts.map((a) => a.id))
-  const hit = sorted.find((t) => types.includes(t.type) && ids.has(t.accountId))
-  return hit?.accountId || accounts.find((a) => a.kind !== 'credit')?.id || accounts[0]?.id || ''
-}
-
 function initialDraft(txn, prefill, state, derived, today) {
-  const source = txn || prefill || {}
+  const source = txn && prefill ? { ...txn, ...prefill } : txn || prefill || {}
   const type = TYPE_ORDER.includes(source.type) ? source.type : 'expense'
   const loan = source.loanId ? state.loans.find((l) => l.id === source.loanId) : null
   let amount = ''
   if (Number(source.amount) > 0) amount = String(source.amount)
   else if (type === 'emi' && loan?.emi > 0) amount = String(loan.emi)
-  const fallbackAccount = loan?.accountId || lastAccount(derived.sorted, state.accounts, [type])
+  const fallbackAccount = loan?.accountId || recentAccountId(derived.sorted, state.accounts, [type])
   return {
     type,
     amount,
@@ -145,13 +139,16 @@ function OweHint({ person, type, onFill }) {
   )
 }
 
-function TxnEditor({ txn, prefill, round, onDone, onAnother }) {
+function TxnEditor({ txn, prefill, round, onDone, onAnother, onSaved }) {
   const { state, dispatch, derived, today } = useFinance()
   const ui = useUi()
   const { deleteEntry } = useActions()
   const form = useRef(null)
   const [draft, setDraft] = useState(() => initialDraft(txn, prefill, state, derived, today))
-  const [newPerson, setNewPerson] = useState(state.people.length ? null : '')
+  const [newPerson, setNewPerson] = useState(() => {
+    if (prefill?.personName && !prefill.personId) return String(prefill.personName)
+    return state.people.length ? null : ''
+  })
   const [tried, setTried] = useState(false)
 
   const { type } = draft
@@ -209,19 +206,6 @@ function TxnEditor({ txn, prefill, round, onDone, onAnother }) {
       accountId: accounts.some((a) => a.id === entry.accountId) ? entry.accountId : draft.accountId,
     })
 
-  const celebrateNew = (record, personBefore) => {
-    if (record.type === 'emi' && record.loanId) {
-      const status = derived.loans.find((s) => s.loan.id === record.loanId)
-      if (!status || status.done) return
-      const left = status.remaining - 1
-      if (left <= 0) ui.celebrate('paidoff', `${status.loan.name} is fully paid off`)
-      else ui.celebrate('emi', `${status.loan.name} · ${plural(left, 'EMI')} to go`)
-    } else if (personBefore && Math.abs(personBefore.net) >= 0.005) {
-      const after = round2(personBefore.net + PERSON_SIGN[record.type] * record.amount)
-      if (Math.abs(after) < 0.005) ui.celebrate('settled', `All square with ${personBefore.name}`)
-    }
-  }
-
   const save = (another) => {
     const found = validate(draft, newPerson)
     if (Object.keys(found).length) {
@@ -230,52 +214,14 @@ function TxnEditor({ txn, prefill, round, onDone, onAnother }) {
       requestAnimationFrame(() => node?.querySelector('.is-invalid input, .is-invalid select')?.focus())
       return
     }
-    const amount = parseAmount(draft.amount)
-    let personId = isPeople(type) ? draft.personId : ''
-    let personBefore = isPeople(type) ? derived.people.find((p) => p.id === personId) : null
-    if (isPeople(type) && newPerson !== null) {
-      const name = newPerson.trim().slice(0, 40)
-      const existing = derived.people.find((p) => p.name.toLowerCase() === name.toLowerCase())
-      if (existing) {
-        personId = existing.id
-        personBefore = existing
-      } else {
-        personId = uid('p')
-        personBefore = null
-        dispatch({ type: 'person/add', person: { id: personId, name } })
-      }
+    const input = {
+      ...draft,
+      amount: parseAmount(draft.amount),
+      personId: newPerson === null ? draft.personId : '',
+      personName: newPerson || '',
     }
-
-    const record = {
-      id: txn?.id || uid('t'),
-      type,
-      amount,
-      date: draft.date,
-      note: draft.note.trim(),
-      category: hasCategory(type) ? draft.category : type === 'emi' ? 'emi' : '',
-      accountId: draft.accountId || '',
-      toAccountId: type === 'transfer' ? draft.toAccountId : '',
-      personId,
-      loanId: type === 'emi' ? draft.loanId : '',
-      createdAt: txn?.createdAt || stamp(),
-    }
-
-    const what = hasCategory(type) ? categoryMeta(record.category).short : TYPE_META[type].label
-    const amountText = ui.privacy ? '' : ` ${formatINR(amount)}`
-    if (txn) {
-      dispatch({ type: 'txn/update', txn: record })
-      ui.toast(`Updated${amountText} · ${what}`, {
-        tone: 'sky',
-        action: { label: 'Undo', run: () => dispatch({ type: 'txn/update', txn }) },
-      })
-    } else {
-      dispatch({ type: 'txn/add', txn: record })
-      ui.toast(`${TYPE_META[type].verb}${amountText} · ${what}`, {
-        tone: TYPE_META[type].tone,
-        action: { label: 'Undo', run: () => dispatch({ type: 'txn/delete', id: record.id }) },
-      })
-      celebrateNew(record, personBefore)
-    }
+    const { record } = commitEntry({ dispatch, derived, ui }, input, { original: txn || null })
+    onSaved?.(record)
 
     if (another) onAnother({ type, date: draft.date, accountId: draft.accountId, toAccountId: draft.toAccountId })
     else onDone()
@@ -558,7 +504,7 @@ function TxnEditor({ txn, prefill, round, onDone, onAnother }) {
 }
 
 /** New or edited money entry. "Save & add another" remounts a fresh editor. */
-export default function TxnForm({ txn, prefill, onDone }) {
+export default function TxnForm({ txn, prefill, onDone, onSaved }) {
   const [round, setRound] = useState({ n: 0, prefill })
   return (
     <TxnEditor
@@ -567,6 +513,7 @@ export default function TxnForm({ txn, prefill, onDone }) {
       prefill={round.prefill}
       round={round.n}
       onDone={onDone}
+      onSaved={round.n === 0 ? onSaved : undefined}
       onAnother={(carry) => setRound((current) => ({ n: current.n + 1, prefill: carry }))}
     />
   )

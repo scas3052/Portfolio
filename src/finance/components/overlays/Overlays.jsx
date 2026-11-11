@@ -1,6 +1,7 @@
 import { AnimatePresence } from 'motion/react'
 import { createPortal } from 'react-dom'
 import { useUi } from '../../store/contexts'
+import AgentHost from '../agent/AgentHost'
 import Celebration from './Celebration'
 import LockScreen from './LockScreen'
 import Palette from './Palette'
@@ -15,6 +16,7 @@ export default function Overlays() {
       <SheetHost />
       {createPortal(
         <>
+          <AgentHost />
           <AnimatePresence>{paletteOpen && <Palette key="palette" onClose={() => setPaletteOpen(false)} />}</AnimatePresence>
           <Toasts />
           <Celebration />

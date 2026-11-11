@@ -143,8 +143,8 @@ export default function Welcome() {
             </button>
           </div>
           <p className="g-welcome__note">
-            Everything stays in this browser (localStorage). Nothing is uploaded. Sample data can be wiped from the
-            banner later.
+            Everything stays in this browser (localStorage). Nothing is uploaded unless you ask the Munshi assistant a
+            question. Sample data can be wiped from the banner later.
           </p>
         </form>
       </motion.div>

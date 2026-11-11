@@ -94,6 +94,8 @@ export function reducer(state, action) {
       return { ...state, people: replaceById(state.people, { id: action.person.id, name }) }
     }
     case 'person/delete':
+      // ifUnused: an undo cleaning up a person it created, but only once nothing points at them.
+      if (action.ifUnused && state.transactions.some((t) => t.personId === action.id)) return state
       return {
         ...state,
         people: withoutId(state.people, action.id),

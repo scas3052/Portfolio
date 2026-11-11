@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   LuDatabase,
   LuDownload,
   LuEye,
   LuEyeOff,
+  LuFeather,
   LuFileSpreadsheet,
   LuFlaskConical,
   LuInfo,
@@ -19,6 +20,8 @@ import {
   LuUpload,
   LuUserRound,
 } from 'react-icons/lu'
+import { clearChat } from '../agent/agentConfig'
+import AssistantSettings from '../components/agent/AssistantSettings'
 import { HoldButton, Segmented, ViewHeader } from '../components/bits'
 import { useActions } from '../hooks/useActions'
 import { parseBackup } from '../lib/backup'
@@ -27,9 +30,9 @@ import { monthLabel } from '../lib/dates'
 import { plural } from '../lib/format'
 import { useFinance, useUi } from '../store/contexts'
 
-function Group({ icon: Icon, title, index, className, children }) {
+function Group({ icon: Icon, title, index, className, children, ...rest }) {
   return (
-    <section className={cx('g-settings__group', className)} style={{ '--i': index }} aria-label={title}>
+    <section className={cx('g-settings__group', className)} style={{ '--i': index }} aria-label={title} {...rest}>
       <h2 className="g-settings__title">
         <span className="g-tile__icon" aria-hidden="true">
           <Icon />
@@ -70,12 +73,29 @@ function NameField({ initial, onSave }) {
   )
 }
 
-export default function Settings() {
+export default function Settings({ params }) {
   const { state, dispatch, derived, today } = useFinance()
   const ui = useUi()
   const { exportJSON, exportCSV, lockNow, goPortfolio } = useActions()
   const fileInput = useRef(null)
   const hasPin = Boolean(state.settings.pinHash)
+  const focus = params?.focus
+
+  // Munshi's gear button lands here with ?focus=assistant: bring its group into view once the page has settled.
+  useEffect(() => {
+    if (focus !== 'assistant') return undefined
+    const timer = setTimeout(() => {
+      const group = document.getElementById('g-settings-munshi')
+      if (!group) return
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      group.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+      group.classList.remove('is-spotlit')
+      void group.offsetWidth
+      group.classList.add('is-spotlit')
+      group.focus({ preventScroll: true })
+    }, 320)
+    return () => clearTimeout(timer)
+  }, [focus])
 
   const bytes = useMemo(() => new Blob([JSON.stringify(state)]).size, [state])
   const counts = [
@@ -139,12 +159,14 @@ export default function Settings() {
 
   const erase = () => {
     ui.closeSheet()
+    ui.setAgentOpen(false)
+    clearChat()
     dispatch({ type: 'data/clear' })
   }
 
   return (
     <div className="g-view g-settings-view">
-      <ViewHeader title="Settings" tone="gray" sub="Your name, the look, the lock and your data." />
+      <ViewHeader title="Settings" tone="gray" sub="Your name, the look, the lock, Munshi and your data." />
 
       <div className="g-settings">
         <Group icon={LuUserRound} title="You" index={0}>
@@ -238,10 +260,21 @@ export default function Settings() {
           </p>
         </Group>
 
-        <Group icon={LuInfo} title="About" index={4}>
+        <Group
+          id="g-settings-munshi"
+          icon={LuFeather}
+          title="Munshi"
+          index={4}
+          className="g-settings__group--munshi"
+          tabIndex={-1}
+        >
+          <AssistantSettings />
+        </Group>
+
+        <Group icon={LuInfo} title="About" index={5}>
           <p className="g-settings__note">
-            Gullak is a private money notebook: no server, no sign-in, no tracking. Press <kbd className="g-kbd">?</kbd>{' '}
-            for shortcuts.
+            Gullak is a private money notebook: no sign-in, no tracking, and your entries stay in this browser. Only what
+            you ask Munshi leaves the device, through your own relay. Press <kbd className="g-kbd">?</kbd> for shortcuts.
           </p>
           <div className="g-settings__actions">
             <button type="button" className="g-btn g-press" onClick={() => ui.openSheet('shortcuts')}>
@@ -253,7 +286,7 @@ export default function Settings() {
           </div>
         </Group>
 
-        <Group icon={LuTrash2} title="Danger zone" index={5} className="g-settings__group--danger">
+        <Group icon={LuTrash2} title="Danger zone" index={6} className="g-settings__group--danger">
           <div className="g-settings__row">
             <span className="g-settings__label">
               Try the sample data
@@ -266,7 +299,7 @@ export default function Settings() {
           <div className="g-settings__row">
             <span className="g-settings__label">
               Erase everything
-              <small>Deletes every entry, account, loan, goal and the PIN. There’s no undo.</small>
+              <small>Deletes every entry, account, loan, goal, the PIN and Munshi’s chat. There’s no undo.</small>
             </span>
             <HoldButton tone="rose" icon={LuTrash2} onConfirm={erase} duration={1600}>
               Hold to erase

@@ -19,6 +19,17 @@ const GROUPS = [
     ],
   },
   {
+    title: 'Talking to Munshi',
+    tone: 'coral',
+    items: [
+      { keys: [['A']], label: 'Ask Munshi' },
+      { keys: [[MOD_KEY, 'J']], label: 'Open or close Munshi' },
+      { keys: [['Enter']], label: 'Send your message' },
+      { keys: [['Shift', 'Enter']], label: 'New line' },
+      { keys: [['Esc']], label: 'Close Munshi (drafts wait for you)' },
+    ],
+  },
+  {
     title: 'Getting around',
     tone: 'sky',
     items: [

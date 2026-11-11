@@ -33,6 +33,7 @@ export default function UiProvider({ children }) {
   const [lockedState, setLocked] = useState(() => Boolean(state.settings.pinHash))
   const [pickedMonth, setPickedMonth] = useState(() => monthOf(today))
   const [theme, setTheme] = useState(() => (document.documentElement.dataset.finTheme === 'ink' ? 'ink' : 'paper'))
+  const [agent, setAgent] = useState({ open: false, closedAt: 0, prompt: null })
   const hiddenAt = useRef(0)
 
   const pinHash = state.settings.pinHash
@@ -76,13 +77,34 @@ export default function UiProvider({ children }) {
     })
   }, [theme])
 
+  // `closedAt` lets the launcher show an unread dot for replies that land after the panel was closed.
+  const setAgentOpen = useCallback((next) => {
+    const now = Date.now()
+    setAgent((current) => {
+      const open = Boolean(typeof next === 'function' ? next(current.open) : next)
+      if (open === current.open) return current
+      return open ? { ...current, open } : { open, closedAt: now, prompt: null }
+    })
+  }, [])
+  const toggleAgent = useCallback(() => setAgentOpen((open) => !open), [setAgentOpen])
+
+  // Other surfaces (the command palette) can hand Munshi a question to send as soon as it opens.
+  const askAgent = useCallback((text) => {
+    const question = String(text || '').trim()
+    setAgent((current) => ({ ...current, open: true, prompt: question ? { id: uid('ask'), text: question } : null }))
+  }, [])
+  const takeAgentPrompt = useCallback((id) => {
+    setAgent((current) => (current.prompt?.id === id ? { ...current, prompt: null } : current))
+  }, [])
+
   const lock = useCallback(() => {
     if (!pinHash) return false
     setPaletteOpen(false)
     setSheet(null)
+    setAgentOpen(false)
     setLocked(true)
     return true
-  }, [pinHash])
+  }, [pinHash, setAgentOpen])
   const unlock = useCallback(() => setLocked(false), [])
 
   const privacy = state.settings.privacy
@@ -98,6 +120,7 @@ export default function UiProvider({ children }) {
     const lockAway = () => {
       setSheet(null)
       setPaletteOpen(false)
+      setAgentOpen(false)
       setLocked(true)
     }
     const onVisibility = () => {
@@ -115,7 +138,7 @@ export default function UiProvider({ children }) {
       window.clearTimeout(timer)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [pinHash])
+  }, [pinHash, setAgentOpen])
 
   useEffect(() => {
     const onFail = () =>
@@ -140,6 +163,13 @@ export default function UiProvider({ children }) {
       endCelebration,
       paletteOpen,
       setPaletteOpen,
+      agentOpen: agent.open,
+      agentClosedAt: agent.closedAt,
+      agentPrompt: agent.prompt,
+      setAgentOpen,
+      toggleAgent,
+      askAgent,
+      takeAgentPrompt,
       locked,
       lock,
       unlock,
@@ -163,6 +193,11 @@ export default function UiProvider({ children }) {
       celebrate,
       endCelebration,
       paletteOpen,
+      agent,
+      setAgentOpen,
+      toggleAgent,
+      askAgent,
+      takeAgentPrompt,
       locked,
       lock,
       unlock,

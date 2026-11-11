@@ -6,6 +6,7 @@ import {
   LuArrowUpRight,
   LuEye,
   LuEyeOff,
+  LuFeather,
   LuFileDown,
   LuFileSpreadsheet,
   LuHandCoins,
@@ -39,7 +40,7 @@ function matches(item, words) {
 
 /** ⌘K command palette that prints out like a shop receipt. */
 export default function Palette({ onClose }) {
-  const { derived, today } = useFinance()
+  const { state, derived, today } = useFinance()
   const ui = useUi()
   const actions = useActions()
   const [query, setQuery] = useState('')
@@ -67,7 +68,9 @@ export default function Palette({ onClose }) {
     run: () => navigate(view.id),
   }))
 
+  const munshi = state.settings.onboarded
   const commands = [
+    munshi && { id: 'munshi', label: 'Ask Munshi', keywords: 'assistant ai chat agent ask help question note', icon: LuFeather, keys: 'A', run: () => ui.setAgentOpen(true) },
     { id: 'spend', label: 'Add a spend', keywords: 'expense new entry paid bought', icon: LuArrowUpRight, keys: 'N', run: () => actions.addEntry({ type: 'expense' }) },
     { id: 'income', label: 'Add income', keywords: 'salary earning received credit', icon: LuArrowDownLeft, keys: 'I', run: () => actions.addEntry({ type: 'income' }) },
     { id: 'transfer', label: 'Move money between accounts', keywords: 'transfer self', icon: LuArrowLeftRight, run: () => actions.addEntry({ type: 'transfer' }) },
@@ -92,7 +95,9 @@ export default function Palette({ onClose }) {
     { id: 'csv', label: 'Export entries as CSV', keywords: 'excel sheet export', icon: LuFileSpreadsheet, run: actions.exportCSV },
     { id: 'shortcuts', label: 'Keyboard shortcuts', keywords: 'keys help hotkeys', icon: LuKeyboard, keys: '?', run: () => ui.openSheet('shortcuts') },
     { id: 'portfolio', label: 'Back to portfolio', keywords: 'portfolio home exit leave', icon: LuUndo2, run: actions.goPortfolio },
-  ].map((item) => ({ ...item, section: 'Actions' }))
+  ]
+    .filter(Boolean)
+    .map((item) => ({ ...item, section: 'Actions' }))
 
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   let items = [...goTo, ...commands].filter((item) => matches(item, words))
@@ -113,6 +118,11 @@ export default function Palette({ onClose }) {
       if (entries.length === 6) break
     }
     items = [...items, ...entries]
+  }
+  // Anything typed can go straight to Munshi as a question or a note ("paid 240 for lunch").
+  const question = query.trim()
+  if (munshi && question.length >= 3) {
+    items = [...items, { id: 'ask-munshi', section: 'Munshi', label: `Ask “${question}”`, icon: LuFeather, run: () => ui.askAgent(question) }]
   }
 
   const current = items.length ? Math.min(active, items.length - 1) : -1

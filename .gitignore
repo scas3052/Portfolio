@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Secrets (provider keys, assistant passphrase) and deploy CLI state
+.env
+.env.*
+!.env.example
+.vercel
+.netlify
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

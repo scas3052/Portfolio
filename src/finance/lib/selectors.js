@@ -281,6 +281,13 @@ export function frequentEntries(transactions, today, limit = 6) {
     .slice(0, limit)
 }
 
+/** The account most recently used for any of `types`, else the first non-credit account. */
+export function recentAccountId(sorted, accounts, types) {
+  const ids = new Set(accounts.map((a) => a.id))
+  const hit = sorted.find((t) => types.includes(t.type) && ids.has(t.accountId))
+  return hit?.accountId || accounts.find((a) => a.kind !== 'credit')?.id || accounts[0]?.id || ''
+}
+
 export function describeTxn(t, lookups) {
   const account = lookups.accounts.get(t.accountId)
   const toAccount = lookups.accounts.get(t.toAccountId)

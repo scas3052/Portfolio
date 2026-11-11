@@ -10,6 +10,7 @@ import './styles/layout.css'
 import './styles/components.css'
 import './styles/overlays.css'
 import './styles/views.css'
+import './styles/agent.css'
 import FinanceApp from './FinanceApp.jsx'
 
 createRoot(document.getElementById('gullak-root')).render(

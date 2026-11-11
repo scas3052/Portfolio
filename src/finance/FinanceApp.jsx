@@ -59,6 +59,9 @@ function Shell() {
     sheet,
     paletteOpen,
     setPaletteOpen,
+    agentOpen,
+    setAgentOpen,
+    toggleAgent,
     openSheet,
     togglePrivacy,
     toggleTheme,
@@ -97,7 +100,15 @@ function Shell() {
       setPaletteOpen((value) => !value)
       return
     }
+    if (mod && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'j' && state.settings.onboarded) {
+      event.preventDefault()
+      setPaletteOpen(false)
+      toggleAgent()
+      return
+    }
     if (mod || event.altKey || paletteOpen || isTypingTarget(event.target)) return
+    // Single letters belong to the page; inside Munshi's panel they would fire behind the user's back.
+    if (event.target instanceof Element && event.target.closest('.g-mk-layer')) return
 
     const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
     const stepsMonth = key === '[' || key === ']'
@@ -111,7 +122,10 @@ function Shell() {
     else if (key === 'h') togglePrivacy()
     else if (key === 't') toggleTheme()
     else if (key === 'l') lockNow()
-    else if (key === '?') openSheet('shortcuts')
+    else if (key === 'a' && state.settings.onboarded) {
+      if (agentOpen) document.getElementById('g-mk-input')?.focus()
+      else setAgentOpen(true)
+    } else if (key === '?') openSheet('shortcuts')
     else if (stepsMonth && meta.month) {
       const next = addMonths(month, key === '[' ? -1 : 1)
       if (next < firstMonth || next > currentMonth) return

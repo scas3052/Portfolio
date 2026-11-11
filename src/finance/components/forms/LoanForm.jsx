@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { LuCalculator, LuTrash2, LuWandSparkles } from 'react-icons/lu'
+import { nextTone } from '../../agent/commit'
 import { evaluate } from '../../lib/calc'
-import { TONES } from '../../lib/categories'
 import { toneVar } from '../../lib/cx'
 import { addMonths, isMonth, monthDiff, monthLabel, monthOf } from '../../lib/dates'
 import { formatINR, plural, round2 } from '../../lib/format'
@@ -76,27 +76,32 @@ function duesSoFar(startMonth, dueDay, today) {
   return months + (Number(today.slice(8, 10)) >= dueDay ? 1 : 0)
 }
 
-/** Add or edit a loan so Gullak can track every EMI paid and left. */
-export default function LoanForm({ loan, onDone }) {
+/** Add or edit a loan so Gullak can track every EMI paid and left. `prefill` seeds a new one. */
+export default function LoanForm({ loan, prefill, onDone, onSaved }) {
   const { state, dispatch, derived, today } = useFinance()
   const ui = useUi()
   const form = useRef(null)
   const status = loan ? derived.loans.find((s) => s.loan.id === loan.id) : null
   const payments = status ? status.payments : NO_PAYMENTS
   const logged = payments.length
-  const [draft, setDraft] = useState(() => ({
-    name: loan?.name || '',
-    lender: loan?.lender || '',
-    emi: loan?.emi ? String(loan.emi) : '',
-    tenure: loan ? String(loan.tenure) : '',
-    paidBefore: loan?.paidBefore ? String(loan.paidBefore) : '',
-    startMonth: loan?.startMonth || monthOf(today),
-    dueDay: String(loan?.dueDay || 5),
-    rate: loan?.rate ? String(loan.rate) : '',
-    principal: loan?.principal ? String(loan.principal) : '',
-    accountId: loan ? loan.accountId : state.accounts.find((a) => a.kind === 'salary' || a.kind === 'savings')?.id || '',
-    color: loan?.color || TONES[(state.loans.length + 8) % TONES.length],
-  }))
+  const [draft, setDraft] = useState(() => {
+    const seed = loan || prefill || {}
+    const text = (value) => (value ? String(value) : '')
+    const fallbackAccount = state.accounts.find((a) => a.kind === 'salary' || a.kind === 'savings')?.id || ''
+    return {
+      name: seed.name || '',
+      lender: seed.lender || '',
+      emi: text(seed.emi),
+      tenure: text(seed.tenure),
+      paidBefore: text(seed.paidBefore),
+      startMonth: seed.startMonth || monthOf(today),
+      dueDay: String(seed.dueDay || 5),
+      rate: text(seed.rate),
+      principal: text(seed.principal),
+      accountId: loan ? loan.accountId : prefill?.accountId || fallbackAccount,
+      color: loan?.color || nextTone('loan', state),
+    }
+  })
   const [tried, setTried] = useState(false)
   const errors = tried ? validate(draft) : {}
   const set = (patch) => setDraft((value) => ({ ...value, ...patch }))
@@ -131,6 +136,7 @@ export default function LoanForm({ loan, onDone }) {
     }
     dispatch({ type: loan ? 'loan/update' : 'loan/add', loan: record })
     ui.toast(loan ? `${record.name} updated` : `${record.name} added. Tap “Mark paid” each month.`, { tone: 'coral' })
+    onSaved?.(record)
     onDone()
   }
 
