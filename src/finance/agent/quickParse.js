@@ -4,7 +4,7 @@
 import { categoryMeta } from '../lib/categories'
 import { draftEntries, EPS, MAX_ENTRIES } from './entries'
 import { findVerb, groupWords, kindAccount, personFrom, scanDates, scanMoney, Skip, skip, textOf, tokenize, VERBS } from './quickLex'
-import { guessCategory, norm, resolveAccount, resolveCategory, resolvePerson } from './resolve'
+import { guessCategory, isVaguePerson, norm, resolveAccount, resolveCategory, resolvePerson } from './resolve'
 
 const QUESTION =
   /\?\s*$|^(?:how|what|whats|when|where|why|which|who|whom|whose|did|do|does|is|are|am|was|were|can|could|should|would|will|shall|show|list|tell|give me|find|compare|explain|summari[sz]e|analy[sz]e|help|calc(?:ulate)?|predict|forecast|estimate|suggest|plan|check|any|have i|search|display|open|go to)\b/
@@ -26,6 +26,7 @@ const LOAN_DROP = words('emi emis paid pay loan loans for my the of this month m
 const OUT_PREPS = words('from via using through thru with by in into')
 const IN_PREPS = words('to in into via through thru by')
 const GUESS_PREPS = words('on for at with')
+const NOTE_PREPS = words('for on at')
 const PEOPLE = ['lend', 'borrow', 'collect', 'repay']
 const NO_AMOUNT = ['emi', 'collect', 'repay']
 const ORDER = {
@@ -35,7 +36,43 @@ const ORDER = {
   repay: ['to', 'object', 'loose'],
 }
 
+// "Ravi ne mere (lunch ke) liye 300 diye": Ravi paid 300 on the user's behalf.
+const NE_MERE_LIYE =
+  /^((?:\p{L}+ ){1,3})ne (?:mere|meri|mera|hamare|humare|hamara) (?:(.+?) (?:ke|ki|ka) )?(?:liye|lie|taraf se|badle(?: mein| me)?)(?: (.+?))? (?:diye|diya|di|kiye|kiya|ki|bhare|bhara|bhari)(?: (?:hai|hain|h|tha|thi|the))?$/iu
+const HINDI_FILLER = words('ka ke ki ko se pe par mein me wala wale wali order pay paid payment bhar kar de di kharch kharcha kharche rs rupees rupaye rupay')
+// Hindi words that carry who paid whom ("Ravi ne … diye", "mujhe", "wapas"), which the rules below can't read.
+const HINDI = /\b(?:ne|liye|mujhe|mujhko|maine|usne|unhone|humne|hamne|hamko|humko|kiye|diye|wapas|vapas|udhaar|udhar)\b/
+const BEHALF = new Set(['my behalf', 'our behalf', 'behalf of me', 'behalf of us'])
+
 const fail = (reason) => ({ confident: false, drafts: [], errors: [], entries: [], reason })
+
+/** "for me", "for my lunch", "on my behalf" → { g, what } where `what` is what was paid for. */
+function forMeGroup(groups) {
+  for (const g of groups) {
+    const ws = g.words.map((t) => t.w)
+    if (g.prep === 'for' && ws.length === 1 && (ws[0] === 'me' || ws[0] === 'us')) return { g, what: [] }
+    if (g.prep === 'for' && ws.length > 1 && (ws[0] === 'my' || ws[0] === 'our')) return { g, what: g.words.slice(1) }
+    if (g.prep === 'on' && BEHALF.has(ws.join(' '))) return { g, what: [] }
+  }
+  return null
+}
+
+/** The Hinglish "X ne mere liye … diye" → { person, note }, or null when the clause isn't that. */
+function onBehalf(tokens, { state }) {
+  const match = textOf(tokens.filter((t) => !t.role)).match(NE_MERE_LIYE)
+  if (!match) return null
+  const name = match[1].trim()
+  const hit = resolvePerson(name, state.people)
+  const known = hit && !hit.isNew ? hit.item : null
+  if (!known) {
+    if (isVaguePerson(name)) skip('vague')
+    if (name.includes(' ')) skip('person')
+    if (guessCategory(name, 'expense') || guessCategory(name, 'income') || resolveAccount(name, state.accounts)) skip('not a person')
+  }
+  const what = [match[2], match[3]].filter(Boolean).join(' ').split(' ').filter((w) => !HINDI_FILLER.has(w.toLowerCase())).join(' ')
+  if (ACCOUNTISH.test(what.toLowerCase())) skip('unlinked')
+  return { person: known ? known.id : name, note: what ? `Paid for ${what}` : 'Paid for me' }
+}
 
 /** Reads a plain sentence into entry drafts without the model. */
 export function quickParse(text, ctx) {
@@ -69,6 +106,14 @@ function readClause(clause, ctx, carry) {
   const date = scanDates(tokens, today) || carry.date
   let amount = scanMoney(tokens)
   const groups = groupWords(tokens)
+  const behalf = onBehalf(tokens, ctx)
+  if (behalf) {
+    if (amount == null) skip('amount')
+    carry.date = date
+    carry.kind = 'borrow'
+    return { type: 'borrow', amount, category: '', account: 'none', toAccount: '', person: behalf.person, loan: '', date, note: behalf.note }
+  }
+  if (HINDI.test(lower)) skip('hindi')
   const used = new Set()
   const candidates = []
   for (const g of groups) {
@@ -135,6 +180,8 @@ function readClause(clause, ctx, carry) {
   let needCategory = false
   let incomeWords = []
   const kind = verb?.kind || ''
+  // "Ravi paid 300 for my lunch": Ravi paid the shop, so the user owes Ravi and none of their accounts moved.
+  const forMe = kind === 'expense' && subject.length && !meAfter && !back ? forMeGroup(groups) : null
   if (kind === 'lend') type = meAfter || subject.length ? 'borrow' : 'lend'
   else if (kind === 'borrow') {
     const from = seg('from')
@@ -160,7 +207,11 @@ function readClause(clause, ctx, carry) {
   } else if (kind === 'expense' || kind === 'give') {
     if (back) type = subject.length || meAfter ? 'collect' : 'repay'
     else if (meAfter && subject.length) type = 'collect'
-    else if (subject.length || meAfter) skip('direction')
+    else if (forMe) {
+      type = 'borrow'
+      order = ['subject']
+      used.add(forMe.g)
+    } else if (subject.length || meAfter) skip('direction')
     else if (kind === 'expense' && emiWord) type = 'emi'
     else {
       type = 'expense'
@@ -220,6 +271,7 @@ function readClause(clause, ctx, carry) {
       if (name) {
         const hit = resolvePerson(name, state.people)
         const known = hit && !hit.isNew ? hit.item : null
+        if (!known && isVaguePerson(name)) skip('vague')
         if (!known && (guessCategory(name, 'expense') || guessCategory(name, 'income') || resolveAccount(name, state.accounts))) skip('not a person')
         if (type === 'collect' && !(known && netOf(known) > EPS)) skip('owes')
         if (type === 'repay' && !(known && netOf(known) < -EPS)) skip('owed')
@@ -245,6 +297,9 @@ function readClause(clause, ctx, carry) {
     else if (withdraw) toAccount = state.accounts.find((a) => a.kind === 'cash' && !a.archived)?.id || skip('cash')
     else skip('to')
     if (from) account = accountOf(from)
+  } else if (forMe) {
+    if (candidates.length || groups.some((g) => g.prep && !used.has(g) && !NOTE_PREPS.has(g.prep))) skip('unlinked')
+    account = 'none'
   } else {
     const preps = income ? IN_PREPS : OUT_PREPS
     for (const g of groups) {
@@ -271,10 +326,11 @@ function readClause(clause, ctx, carry) {
   if (!PEOPLE.includes(type)) leftovers.push(object)
   if (leftovers.some((list) => existing(list))) skip('person')
 
-  const rest = [...object, ...looseWords, ...incomeWords]
+  const rest = [...object, ...looseWords, ...incomeWords, ...(forMe ? forMe.what : [])]
   for (const g of groups) if (g.prep && !used.has(g)) rest.push(g.prepTok, ...g.words)
   rest.sort((a, b) => a.i - b.i)
   let note = textOf(rest.filter((t) => !NOTE_DROP.has(t.w) && !dropTok.has(t))).replace(/^(?:on|for|at|from|to)\s+/i, '')
+  if (forMe) note = note ? `Paid for ${note}` : 'Paid for me'
 
   let category = ''
   let loan = ''
@@ -312,6 +368,6 @@ function readClause(clause, ctx, carry) {
 
   carry.date = date
   carry.kind = withdraw ? 'withdraw' : type
-  if (account) carry.account = account
+  if (account && !forMe) carry.account = account
   return { type, amount: amount ?? '', category, account, toAccount, person, loan, date, note }
 }

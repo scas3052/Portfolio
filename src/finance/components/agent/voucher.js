@@ -34,7 +34,7 @@ function entryRows(data, { derived, today }) {
     rows.push(['From', nameOf(lookups.accounts, data.accountId)])
     rows.push(['To', nameOf(lookups.accounts, data.toAccountId)])
   } else {
-    rows.push(['Account', nameOf(lookups.accounts, data.accountId)])
+    rows.push(['Account', data.accountId ? nameOf(lookups.accounts, data.accountId) : 'Not linked'])
   }
   rows.push(['Date', day(data.date, today)])
   if (data.note) rows.push(['Note', `“${data.note}”`])

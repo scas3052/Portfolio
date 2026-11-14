@@ -10,10 +10,14 @@ const obj = (properties, required) => ({ type: 'object', properties, ...(require
 const month = str('YYYY-MM, default this month')
 
 const ENTRY = {
-  type: { type: 'string', enum: ENTRY_TYPES },
+  type: {
+    type: 'string',
+    enum: ENTRY_TYPES,
+    description: 'expense: I spent; income: I earned; lend: I gave or paid for someone; borrow: someone gave me or paid for me; collect: someone paid me back; repay: I paid someone back',
+  },
   amount: num('Rupees'),
   category: str('Category id; expense/income only'),
-  account: str('Account paid from / received in (transfer: source)'),
+  account: str('Account paid from / received in (transfer: source); "none" if no account of mine was used'),
   toAccount: str('Transfer destination'),
   person: str('Name, for lend/borrow/collect/repay'),
   loan: str('Loan name, for emi'),
@@ -125,29 +129,45 @@ const WRITE_VERB =
   /\b(spent|spend|spending|paid|pay|bought|buy|ordered|got|received|receive|earned|credited|salary|lent|lend|gave|give|borrowed|borrow|took|repaid|returned|transferred|transfer|moved|sent|send|deposited|withdrew|withdrawn|add|log|record|put|saved|contribute|emi)\b/
 const QUESTION = /^(what|whats|what's|how|why|when|where|which|who|whom|whose|is|are|am|do|does|did|should|will|would|have|has|show|list|tell|compare|explain|summari[sz]e|give me)\b/
 const POLITE = /^(can|could|would|will) you\b|^please\b/
+// Asking to change the book, however politely, is never a read-only question.
+const ACTION_VERB =
+  /\b(delete|remove|edit|change|update|fix|correct|rename|create|set|add|make|undo|move|log|record|split|mark|cancel|hata|hatao|badal|badlo|mita|mitao|jod|jodo|daalo|daal do|likho|likh do|kar ?do)\b/
+// A reply that goes along with (or turns down) what Munshi just offered.
+const CONFIRM = /^(yes|yeah|yep|yup|ya|ok+|okay|sure|alright|do it|go ahead|please do|confirm|correct|right|no|nope|nah|ha+n?|ji|th?(?:ee|e|i)k hai|kar ?do|karo|nahi|nahin)\b/
+// Only these bring in propose_setup, the largest schema.
+const SETUP_WORDS = /\b(new|account|accounts|card|wallet|loan|goal|jar|open|opened|set ?up)\b/
 const AMOUNT = /\d/
 // Years, ISO dates and "5th" aren't amounts.
 const DATEISH = /\b(19|20)\d\d(-\d\d){0,2}\b|\b\d{1,2}(st|nd|rd|th)\b/g
 
+const lower = (text) => String(text ?? '').trim().toLowerCase()
+
 /** The likely intent of a message: 'write', 'read' or 'any'. */
 export function intentOf(text) {
-  const t = String(text ?? '').trim().toLowerCase()
-  if (!t) return 'any'
+  const t = lower(text)
+  if (!t || CONFIRM.test(t)) return 'any'
   const asks = t.includes('?') || QUESTION.test(t)
   const polite = POLITE.test(t)
   const amount = AMOUNT.test(t.replace(DATEISH, ' '))
   if (WRITE_VERB.test(t) && (amount || /\bemi\b/.test(t)) && (!asks || polite)) return 'write'
-  if ((asks || polite) && !amount) return 'read'
+  if ((asks || polite) && !amount && !ACTION_VERB.test(t)) return 'read'
   return 'any'
 }
 
 const asTool = (name) => ({ type: 'function', function: { name, ...TOOLS[name] } })
 
-/** The tool list to send for a message: a smaller set when the intent is clear, to save tokens. */
-export function toolsFor(text) {
-  const intent = intentOf(text)
-  let names = Object.keys(TOOLS)
-  if (intent === 'write') names = [...CORE, ...WRITE_TOOLS]
-  else if (intent === 'read') names = [...CORE, ...READ_TOOLS]
-  return names.map(asTool)
+/**
+ * The tool list to send for a message: a smaller set when the intent is clear, to save tokens.
+ * An answer to Munshi's own question (`followUp`) continues an earlier request, so it gets every tool.
+ */
+export function toolsFor(text, { followUp = false } = {}) {
+  const intent = followUp ? 'any' : intentOf(text)
+  let keep = () => true
+  if (intent === 'read') keep = (name) => CORE.includes(name) || READ_TOOLS.has(name)
+  else if (intent === 'write') {
+    const setup = SETUP_WORDS.test(lower(text))
+    // get_people lets Munshi check who owes whom before drafting a collect or repay.
+    keep = (name) => CORE.includes(name) || name === 'get_people' || (WRITE_TOOLS.has(name) && (setup || name !== 'propose_setup'))
+  }
+  return Object.keys(TOOLS).filter(keep).map(asTool)
 }

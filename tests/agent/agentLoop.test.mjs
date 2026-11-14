@@ -2,8 +2,11 @@ import { test, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildHistory, callId, draftText, MAX_STEPS, runAgent, stepLabel } from '../../src/finance/agent/agentLoop.js'
 import { setPass } from '../../src/finance/agent/agentConfig.js'
+import { intentOf, toolsFor } from '../../src/finance/agent/tools.js'
 import { installWindow, jsonResponse, makeCtx, mockFetch, sseFrames, sseResponse } from '../helpers/ctx.mjs'
 
+const READ_ROUTE = ['get_overview', 'query_transactions', 'calculate', 'get_accounts', 'get_people', 'get_loans', 'get_budgets', 'get_goals']
+const WRITE_ROUTE = ['get_overview', 'query_transactions', 'calculate', 'get_people', 'propose_entries', 'propose_update_entry', 'propose_delete_entry', 'propose_budget', 'propose_goal_contribution']
 const META = { 'x-gullak-provider': 'groq', 'x-gullak-model': 'llama-3.3-70b' }
 const answer = (content) => ({ choices: [{ message: { content }, finish_reason: 'stop' }] })
 const toolCall = (name, args, content = '') => ({
@@ -81,13 +84,37 @@ test('buildHistory keeps finished turns, notes draft cards, and starts and ends 
     { role: 'assistant', content: 'Sure.' },
   ])
 
-  const long = buildHistory([{ role: 'user', text: 'x'.repeat(700) }, { role: 'assistant', text: 'ok' }])
-  assert.equal(long[0].content.length, 600)
+  const long = buildHistory([{ role: 'user', text: 'x'.repeat(900) }, { role: 'assistant', text: 'ok' }])
+  assert.equal(long[0].content.length, 800)
   assert.ok(long[0].content.endsWith('…'))
 
   const turns = Array.from({ length: 10 }, (_, i) => ({ role: i % 2 ? 'assistant' : 'user', text: `m${i}` }))
   assert.deepEqual(buildHistory(turns, 3).map((m) => m.content), ['m8', 'm9'])
   assert.deepEqual(buildHistory(undefined), [])
+})
+
+test('history memos keep saved ids and found entries whole, clipping the words instead', () => {
+  const drafts = [
+    { kind: 'entry', summary: 'Expense ₹200 · Food', status: 'saved', entryId: 't0123456789abcde' },
+    { kind: 'entry', summary: 'Lend ₹500 · Ravi', status: 'pending', entryId: 'tundone' },
+  ]
+  const facts = [
+    { id: 'st_211', title: 'Office canteen', amount: 91, date: '2026-11-09' },
+    { id: 'st_210', title: 'Breakfast', amount: 131, date: '2026-11-08' },
+  ]
+  const [, reply] = buildHistory([{ role: 'user', text: 'q' }, { role: 'assistant', text: 'y'.repeat(900), drafts, facts }])
+  const [words, cards, found] = reply.content.split('\n')
+  assert.equal(cards, '[Draft cards: D1 Expense ₹200 · Food (saved as t0123456789abcde); D2 Lend ₹500 · Ravi (pending)]')
+  assert.equal(found, '[Entries found: st_211 Office canteen ₹91 2026-11-09; st_210 Breakfast ₹131 2026-11-08]')
+  assert.ok(words.endsWith('…'))
+  assert.equal(reply.content.length, 800)
+
+  const many = Array.from({ length: 6 }, (_, i) => ({ id: `t${String(i).repeat(14)}`, title: 'A title of twenty-four c', amount: 12345, date: '2026-11-01' }))
+  const [, short] = buildHistory([{ role: 'user', text: 'q' }, { role: 'assistant', text: 'Here they are.', facts: many }])
+  const line = short.content.split('\n')[1]
+  assert.ok(line.length <= 300)
+  assert.ok(line.endsWith('; +2 more]'))
+  assert.deepEqual(line.match(/t\d+/g), many.slice(0, 4).map((f) => f.id))
 })
 
 test('a plain question is one request with the read tools, and the answer comes back trimmed', async () => {
@@ -102,8 +129,44 @@ test('a plain question is one request with the read tools, and the answer comes 
   assert.deepEqual(calls[0].body.messages.map((m) => m.role), ['system', 'user', 'assistant', 'user'])
   assert.match(calls[0].body.messages[0].content, /^You are Munshi/)
   assert.equal(calls[0].body.messages.at(-1).content, 'how much did I spend on food this month?')
-  assert.deepEqual(names(calls[0]), ['get_overview', 'query_transactions', 'calculate', 'get_accounts', 'get_people', 'get_loans', 'get_budgets', 'get_goals'])
+  assert.deepEqual(names(calls[0]), READ_ROUTE)
   assert.equal(calls[0].body.tool_choice, 'auto')
+})
+
+test('a smaller tool list goes out only when the intent is clear', () => {
+  const intents = [
+    ['how much did I spend on food this month?', 'read'],
+    ['can you show my loans', 'read'],
+    ['spent 200 on lunch', 'write'],
+    ['add my new HDFC card with 5000 due', 'write'],
+    ['can you delete the last entry', 'any'],
+    ['please change yesterday’s lunch to food', 'any'],
+    ['yes, do it?', 'any'],
+    ['theek hai', 'any'],
+    ['haan kar do', 'any'],
+    ['', 'any'],
+  ]
+  for (const [text, intent] of intents) assert.equal(intentOf(text), intent, text)
+
+  const routed = (text, options) => toolsFor(text, options).map((t) => t.function.name)
+  assert.deepEqual(routed('how much did I spend on food this month?'), READ_ROUTE)
+  assert.deepEqual(routed('spent 200 on lunch'), WRITE_ROUTE)
+  assert.deepEqual(routed('add my new HDFC card with 5000 due'), [...WRITE_ROUTE, 'propose_setup'])
+  assert.equal(routed('can you delete the last entry').length, 14)
+  assert.equal(routed('how much did I spend?', { followUp: true }).length, 14)
+})
+
+test('an answer to Munshi’s own question gets every tool', async () => {
+  const calls = script([answer('Done.')])
+  const lent = { role: 'user', content: 'lent 500 to Ravi' }
+  await run('can you use HDFC?', { history: [lent, { role: 'assistant', content: 'Which account was it from?\n[Draft cards: D1 Lend ₹500 (pending)]' }] })
+  await run('can you use HDFC?', { history: [lent, { role: 'assistant', content: 'Done.' }] })
+  const found = 'Which one should I change?\n[Entries found: st_211 Office canteen ₹91 2026-11-09]'
+  await run('the canteen one, make it 120', { history: [lent, { role: 'assistant', content: found }] })
+
+  assert.equal(names(calls[0]).length, 14)
+  assert.deepEqual(names(calls[1]), READ_ROUTE)
+  assert.equal(names(calls[2]).length, 14)
 })
 
 test('tool results go back to the model under fresh ids, read from the current book', async () => {
@@ -125,13 +188,37 @@ test('tool results go back to the model under fresh ids, read from the current b
   assert.equal(JSON.parse(tool.content).total, 1146)
 })
 
+test('entries the reads turned up come back as facts, so the next turn can point at them', async () => {
+  const call = (name, args) => ({ id: 'x', type: 'function', function: { name, arguments: JSON.stringify(args) } })
+  const reads = [
+    call('get_people', { name: 'Ravi' }),
+    call('get_people', { name: 'Nobody' }),
+    call('get_people', { name: 'Ravi' }),
+    call('query_transactions', { month: '2026-11', category: 'food' }),
+  ]
+  script([{ choices: [{ message: { content: '', tool_calls: reads }, finish_reason: 'tool_calls' }] }, answer('Found them.')])
+  const result = await run('show Ravi and my food this month')
+
+  assert.deepEqual(result.steps.map((s) => s.ok), [true, false, true, true])
+  assert.deepEqual(result.facts.map((f) => f.id), ['st_226', 'st_225', 'st_211', 'st_210', 'st_208', 'st_206'])
+  assert.deepEqual(result.facts.slice(0, 3), [
+    { id: 'st_226', title: 'collect Ravi', amount: 1000, date: '2026-10-22' },
+    { id: 'st_225', title: 'lend Ravi Concert ticke…', amount: 2500, date: '2026-09-24' },
+    { id: 'st_211', title: 'Office canteen', amount: 91, date: '2026-11-09' },
+  ])
+
+  const [, reply] = buildHistory([{ role: 'user', text: 'show' }, { role: 'assistant', text: result.text, facts: result.facts }])
+  assert.match(reply.content, /^Found them\.\n\[Entries found: st_226 collect Ravi ₹1000 2026-10-22; st_225 /)
+})
+
 test('clean drafts end the turn at once, with the write tools offered', async () => {
   const calls = script([toolCall('propose_entries', { entries: [{ type: 'expense', amount: 200, category: 'food', note: 'lunch' }] })])
   const result = await run('spent 200 on lunch')
 
   assert.equal(calls.length, 1)
-  assert.deepEqual(names(calls[0]), ['get_overview', 'query_transactions', 'calculate', 'propose_entries', 'propose_update_entry', 'propose_delete_entry', 'propose_budget', 'propose_goal_contribution', 'propose_setup'])
+  assert.deepEqual(names(calls[0]), WRITE_ROUTE)
   assert.equal(result.text, 'Here’s a draft. Check it over and confirm to save.')
+  assert.deepEqual(result.facts, [])
   assert.equal(result.drafts.length, 1)
   assert.deepEqual([result.drafts[0].kind, result.drafts[0].data.amount, result.drafts[0].data.category], ['entry', 200, 'food'])
 
@@ -177,6 +264,7 @@ test(`a model that keeps calling tools is cut off after ${MAX_STEPS} requests`, 
   assert.deepEqual(calls.map((c) => c.body.tool_choice), ['auto', 'auto', 'auto', 'auto', 'none'])
   assert.equal(result.steps.length, MAX_STEPS - 1)
   assert.equal(result.text, 'I couldn’t finish that one. Try rephrasing it?')
+  assert.deepEqual(result.facts, [])
   assert.equal(calls.at(-1).body.messages.length, 2 + 2 * (MAX_STEPS - 1))
 })
 

@@ -32,6 +32,7 @@ test('people rows tell a known person from a new one, or show a gap to fill', ()
   assert.deepEqual(person({ person: 'Priya' }), ['Person', 'Priya (new)'])
   assert.deepEqual(person({}), ['Person', '—'])
   assert.deepEqual(entry({ type: 'lend', amount: 300, person: 'Priya', date: '2026-11-09' }).rows.at(-1), ['Date', 'Yesterday'])
+  assert.deepEqual(entry({ type: 'borrow', amount: 300, person: 'Ravi', account: 'none' }).rows, [['Person', 'Ravi'], ['Account', 'Not linked'], ['Date', 'Today']])
 })
 
 test('edit cards list only what changes, with the old amount alongside', () => {

@@ -55,8 +55,16 @@ test('buildEntry falls back to the usual account when the named one is unknown',
   assert.deepEqual(entry.warnings, ['No account matches “kotak”; used Amazon Pay ICICI'])
 })
 
+test('buildEntry leaves the account unlinked when no account of the user was used', () => {
+  const entry = build({ type: 'borrow', amount: 300, person: 'Ravi', account: 'none', note: 'Paid for lunch' })
+  assert.equal(entry.data.accountId, '')
+  assert.deepEqual(entry.warnings, [])
+  assert.deepEqual(entry.needs, [])
+})
+
 test('buildEntry checks people and what they owe', () => {
   assert.deepEqual(build({ type: 'lend', amount: 100 }).needs, ['Who was it with?'])
+  assert.deepEqual(build({ type: 'borrow', amount: 100, person: 'my friend' }).needs, ['Who was it? Tell me their name.'])
 
   const kiran = build({ type: 'collect', amount: 100, person: 'kiran' })
   assert.equal(kiran.data.personId, 'sp_kiran')

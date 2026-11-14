@@ -14,7 +14,8 @@ const reply = (fields) => ({ id: uid('m'), role: 'assistant', text: '', drafts: 
 
 /**
  * Messages are `{id, role:'user', text}` or `{id, role:'assistant', text, drafts, steps,
- * source:'ai'|'quick', meta?, error?, stopped?, streaming?}`. Drafts carry their own `status`.
+ * source:'ai'|'quick', meta?, facts?, error?, stopped?, streaming?}`. Drafts carry their own
+ * `status`, plus `entryId` once an entry draft is saved; `facts` are entries the reply looked up.
  */
 export function useAgent() {
   const finance = useFinance()
@@ -76,7 +77,15 @@ export function useAgent() {
           },
           onStep: ({ steps, drafts }) => patch(id, { steps, drafts }),
         })
-        patch(id, { text: result.text, drafts: result.drafts, steps: result.steps, meta: result.meta, streaming: false, at: Date.now() })
+        patch(id, {
+          text: result.text,
+          drafts: result.drafts,
+          steps: result.steps,
+          meta: result.meta,
+          facts: result.facts,
+          streaming: false,
+          at: Date.now(),
+        })
       } catch (err) {
         const stopped = err instanceof AgentError && err.code === 'aborted'
         patch(id, (m) =>

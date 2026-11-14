@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   cleanName,
   guessCategory,
+  isVaguePerson,
   kindText,
   norm,
   resolveAccount,
@@ -94,6 +95,12 @@ test('resolvePerson finds known people and flags new ones', () => {
   assert.deepEqual(resolvePerson('raavi', sample.people), { isNew: true, name: 'Raavi', similar: ['Ravi'] })
   assert.deepEqual(resolvePerson('priya', sample.people), { isNew: true, name: 'Priya', similar: [] })
   assert.equal(resolvePerson('', sample.people), null)
+})
+
+test('isVaguePerson tells a role like "my friend" from a name', () => {
+  for (const name of ['friend', 'My Friend', 'my best friend', 'a friend of mine', 'dost', 'mera dost', 'a colleague', 'co-worker', 'someone'])
+    assert.equal(isVaguePerson(name), true, name)
+  for (const name of ['Ravi', 'mom', 'my brother', 'Friendly Bakery', '']) assert.equal(isVaguePerson(name), false, name)
 })
 
 test('guessCategory reads merchants and keywords', () => {

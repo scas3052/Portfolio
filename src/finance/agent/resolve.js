@@ -156,6 +156,14 @@ export function resolvePerson(query, people) {
   return { isNew: true, name, similar }
 }
 
+const VAGUE_PERSON =
+  /^(?:(?:my|a|the|some|one|our|mere|mera|meri|hamare|hamara|ek|koi) )?(?:(?:best|close|old|office|college|school) )?(?:friends?|frnds?|dost|yaar|colleagues?|co ?workers?|room ?mates?|flat ?mates?|class ?mates?|neighbou?rs?|someone|somebody|person|guy|koi|kisi)(?: of mine)?$/
+
+/** "my friend", "a colleague", "someone": a role rather than a name, so ask who it was. */
+export function isVaguePerson(name) {
+  return VAGUE_PERSON.test(norm(name))
+}
+
 const EXPENSE_WORDS = {
   food: ['food', 'swiggy', 'zomato', 'lunch', 'dinner', 'breakfast', 'brunch', 'snack', 'snacks', 'restaurant', 'cafe', 'coffee', 'tea', 'chai', 'biryani', 'pizza', 'burger', 'dominos', 'kfc', 'mcdonalds', 'starbucks', 'meal', 'meals', 'dining', 'canteen', 'mess', 'tiffin', 'juice', 'ice cream', 'sweets', 'bakery', 'eating out', 'dine out'],
   groceries: ['grocery', 'groceries', 'blinkit', 'zepto', 'bigbasket', 'big basket', 'instamart', 'dmart', 'jiomart', 'milk', 'vegetables', 'veggies', 'fruits', 'kirana', 'supermarket', 'eggs', 'atta'],

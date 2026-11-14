@@ -48,7 +48,13 @@ function AgentDock() {
 
   const actions = useMemo(() => {
     const ctxFor = (onUndone) => withUndoHook(live.current.finance, live.current.ui, onUndone)
-    const mark = (messageId, draftId) => () => updateDraft(messageId, draftId, { status: 'saved', error: '' })
+    // The saved entry's id lets Munshi change or delete it in a later turn.
+    const saved = (draft, record) => ({
+      status: 'saved',
+      error: '',
+      ...((draft.kind === 'entry' || draft.kind === 'update') && record?.id ? { entryId: record.id } : {}),
+    })
+    const mark = (messageId, draft) => (record) => updateDraft(messageId, draft.id, saved(draft, record))
 
     return {
       retry,
@@ -58,7 +64,7 @@ function AgentDock() {
         if (message.streaming || draft.status !== 'pending') return
         const reopen = () => updateDraft(message.id, draft.id, { status: 'pending' })
         const result = commitDraft(ctxFor(reopen), draft)
-        updateDraft(message.id, draft.id, result.ok ? { status: 'saved', error: '' } : { error: result.error })
+        updateDraft(message.id, draft.id, result.ok ? saved(draft, result.record) : { error: result.error })
       },
 
       confirmAll: (message) => {
@@ -68,14 +74,12 @@ function AgentDock() {
         const reopen = () => saved.forEach((id) => updateDraft(message.id, id, { status: 'pending' }))
         const outcomes = commitDrafts(ctxFor(reopen), pending)
         saved = outcomes.filter((o) => o.ok).map((o) => o.draft.id)
-        outcomes.forEach((o) =>
-          updateDraft(message.id, o.draft.id, o.ok ? { status: 'saved', error: '' } : { error: o.error }),
-        )
+        outcomes.forEach((o) => updateDraft(message.id, o.draft.id, o.ok ? saved(o.draft, o.record) : { error: o.error }))
       },
 
       edit: (message, draft) => {
         const { openSheet } = live.current.ui
-        const onSaved = mark(message.id, draft.id)
+        const onSaved = mark(message.id, draft)
         const data = draft.data || {}
         if (draft.kind === 'entry') {
           openSheet('txn', { prefill: data, onSaved })

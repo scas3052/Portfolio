@@ -5,7 +5,7 @@ import { monthLabel, monthOf } from '../lib/dates'
 import { formatINR, round2 } from '../lib/format'
 import { uid } from '../lib/id'
 import { ACCOUNT_SIGN, describeTxn, PERSON_SIGN, recentAccountId } from '../lib/selectors'
-import { guessCategory, resolveAccount, resolveCategory, resolveLoan, resolvePerson } from './resolve'
+import { guessCategory, isVaguePerson, resolveAccount, resolveCategory, resolveLoan, resolvePerson } from './resolve'
 import { ENTRY_TYPES } from './tools'
 import { cleanText, parseDate, parseMoney } from './parse'
 
@@ -44,8 +44,12 @@ export const newBatch = () => ({ spent: new Map(), flow: new Map(), owed: new Ma
 const bump = (map, key, by) => map.set(key, round2((map.get(key) || 0) + by))
 const personKey = (data) => data.personId || `new:${data.personName.toLowerCase()}`
 
+// "none": the money never touched the user's accounts (a friend paid the shop directly).
+const NO_ACCOUNT = /^(?:none|no account|not linked|unlinked|n\/?a|-)$/i
+
 export function pickAccount(query, accounts, warnings, fallbackId) {
   const q = cleanText(query, 60)
+  if (NO_ACCOUNT.test(q)) return ''
   const fallback = accounts.find((a) => a.id === fallbackId)
   if (!q) return fallback ? fallback.id : ''
   const hit = resolveAccount(q, accounts)
@@ -89,6 +93,7 @@ function pickPerson(raw, ctx, data, warnings, needs, batch) {
   const query = cleanText(raw.person, 60)
   const hit = query ? resolvePerson(query, ctx.state.people) : null
   if (!hit) return needs.push('Who was it with?')
+  if (hit.isNew && isVaguePerson(query)) return needs.push('Who was it? Tell me their name.')
   if (hit.isNew) {
     const key = hit.name.toLowerCase()
     data.personName = batch.people.get(key) || hit.name

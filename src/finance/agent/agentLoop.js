@@ -10,7 +10,11 @@ export const MAX_STEPS = 5
 // Keeps every request inside the relay's limits (40 messages, 64 KB).
 const MAX_CALLS = 6
 const HISTORY_MESSAGES = 8
-const HISTORY_CHARS = 600
+const HISTORY_CHARS = 800
+// A reply's memo lines outlive its text when a turn is clipped: they carry the ids follow-ups need.
+const MEMO_CHARS = 500
+const MAX_FACTS = 6
+const FACTS_CHARS = 300
 const ID_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 const STEP_LABELS = {
@@ -40,21 +44,64 @@ export function callId() {
 
 const clip = (text, max) => (text.length > max ? `${text.slice(0, max - 1)}…` : text)
 
-function draftMemo(drafts) {
-  if (!Array.isArray(drafts) || !drafts.length) return ''
-  const lines = drafts.map((d, i) => `D${i + 1} ${d.summary || d.kind} (${d.status || 'pending'})`)
-  return `[Draft cards: ${lines.join('; ')}]`
+/** `[Label: a; b; +N more]` with as many whole items as fit in `max` characters, so an id is never cut in half. */
+function memoLine(label, items, max) {
+  for (let n = items.length; n > 0; n -= 1) {
+    const rest = items.length - n
+    const line = `[${label}: ${items.slice(0, n).join('; ')}${rest ? `; +${rest} more` : ''}]`
+    if (line.length <= max) return line
+  }
+  return ''
 }
 
-/** Recent turns as model messages: text plus draft memos, clipped, same-role turns merged, starting with the user and ending on an answer. */
+function draftMemo(drafts) {
+  if (!Array.isArray(drafts) || !drafts.length) return ''
+  const lines = drafts.map((d, i) => {
+    const status = d.status === 'saved' && d.entryId ? `saved as ${d.entryId}` : d.status || 'pending'
+    return `D${i + 1} ${d.summary || d.kind} (${status})`
+  })
+  return memoLine('Draft cards', lines, MEMO_CHARS) || `[Draft cards: ${drafts.length}]`
+}
+
+/** Remembers entries a read tool showed the model, so "change the second one" can reach them by id next turn. */
+function noteFacts(facts, name, result) {
+  if (!result || result.ok === false) return
+  let rows = []
+  if (name === 'query_transactions') rows = result.items || []
+  else if (name === 'get_people' && result.name) {
+    rows = (result.history || []).map((t) => ({ ...t, title: [t.type, result.name, t.note].filter(Boolean).join(' ') }))
+  }
+  for (const t of rows) {
+    if (facts.length >= MAX_FACTS) return
+    if (typeof t?.id !== 'string' || !t.id || facts.some((f) => f.id === t.id)) continue
+    facts.push({ id: t.id, title: clip(String(t.title || t.type || ''), 24), amount: t.amount, date: t.date })
+  }
+}
+
+function factsMemo(facts, max) {
+  if (!Array.isArray(facts) || !facts.length) return ''
+  const items = facts.map((f) => [f.id, f.title, Number.isFinite(f.amount) ? `₹${f.amount}` : '', f.date].filter(Boolean).join(' '))
+  return memoLine('Entries found', items, max)
+}
+
+/** One stored message as history text; an assistant reply keeps its memo lines whole and clips its words to make room. */
+function turnText(m) {
+  const text = typeof m.text === 'string' ? m.text.trim() : ''
+  if (m.role !== 'assistant') return clip(text, HISTORY_CHARS)
+  const cards = draftMemo(m.drafts)
+  const found = factsMemo(m.facts, Math.min(FACTS_CHARS, MEMO_CHARS - (cards ? cards.length + 1 : 0)))
+  const memo = [cards, found].filter(Boolean).join('\n')
+  if (!memo) return clip(text, HISTORY_CHARS)
+  return text ? `${clip(text, HISTORY_CHARS - memo.length - 1)}\n${memo}` : memo
+}
+
+/** Recent turns as model messages: text plus memos, clipped, same-role turns merged, starting with the user and ending on an answer. */
 export function buildHistory(messages, limit = HISTORY_MESSAGES) {
   const out = []
   for (const m of messages || []) {
     if ((m.role !== 'user' && m.role !== 'assistant') || m.error || m.streaming) continue
-    const memo = m.role === 'assistant' ? draftMemo(m.drafts) : ''
-    const text = [typeof m.text === 'string' ? m.text.trim() : '', memo].filter(Boolean).join('\n')
-    if (!text) continue
-    const content = clip(text, HISTORY_CHARS)
+    const content = turnText(m)
+    if (!content) continue
     const last = out[out.length - 1]
     if (last?.role === m.role) last.content = clip(`${last.content}\n\n${content}`, HISTORY_CHARS * 2)
     else out.push({ role: m.role, content })
@@ -64,6 +111,15 @@ export function buildHistory(messages, limit = HISTORY_MESSAGES) {
   // An unanswered question (failed or stopped) would leave two user turns in a row.
   while (recent[recent.length - 1]?.role === 'user') recent.pop()
   return recent
+}
+
+const MEMO_LINE = /\n\[(?:Draft cards|Entries found):[^\n]*/g
+
+/** True when Munshi's last reply in `history` ended with a question, so the new message is probably the answer. */
+export function askedLast(history) {
+  const last = history?.[history.length - 1]
+  if (last?.role !== 'assistant' || typeof last.content !== 'string') return false
+  return /\?[\s"'”’)*_]*$/.test(last.content.replace(MEMO_LINE, '').trim())
 }
 
 /** Words for the bubble when the model went straight to drafts without saying anything. */
@@ -92,12 +148,13 @@ function argumentsJSON(raw) {
 
 /**
  * Runs one user turn. `getCtx()` must return fresh `{state, derived, today}`; it is read
- * again for every tool call. Resolves to `{text, drafts, steps, meta}` and throws
- * AgentError for relay or provider failures (including `aborted`).
+ * again for every tool call. Resolves to `{text, drafts, steps, meta, facts}` (facts: the
+ * entries it looked up, for the next turn's history) and throws AgentError for relay or
+ * provider failures (including `aborted`).
  */
 export async function runAgent({ text, history = [], getCtx, signal, onDelta, onStep }) {
   const start = getCtx()
-  const tools = toolsFor(text)
+  const tools = toolsFor(text, { followUp: askedLast(history) })
   const messages = [
     { role: 'system', content: buildSystemPrompt(start.state, start.derived, start.today) },
     ...history,
@@ -105,6 +162,7 @@ export async function runAgent({ text, history = [], getCtx, signal, onDelta, on
   ]
   const drafts = []
   const steps = []
+  const facts = []
   let meta = null
 
   for (let round = 0; round < MAX_STEPS; round += 1) {
@@ -113,7 +171,7 @@ export async function runAgent({ text, history = [], getCtx, signal, onDelta, on
     meta = reply.meta || meta
     const content = (reply.content || '').trim()
     const calls = final ? [] : reply.toolCalls.slice(0, MAX_CALLS)
-    if (!calls.length) return { text: content || draftText(drafts), drafts, steps, meta }
+    if (!calls.length) return { text: content || draftText(drafts), drafts, steps, meta, facts }
 
     const assistant = { role: 'assistant', content: content || null, tool_calls: [] }
     const results = []
@@ -126,13 +184,14 @@ export async function runAgent({ text, history = [], getCtx, signal, onDelta, on
       const ok = result?.ok !== false
       steps.push({ name: call.name, label: stepLabel(call.name), ok })
       drafts.push(...made)
+      noteFacts(facts, call.name, result)
       results.push({ role: 'tool', tool_call_id: id, content: fitResult(result, limit) })
       if (!WRITE_TOOLS.has(call.name) || !ok || result?.errors) draftsOnly = false
     }
     onStep?.({ steps: [...steps], drafts: [...drafts] })
     // Clean proposals need no commentary; skipping the extra round saves a request.
-    if (draftsOnly) return { text: content || draftText(drafts), drafts, steps, meta }
+    if (draftsOnly) return { text: content || draftText(drafts), drafts, steps, meta, facts }
     messages.push(assistant, ...results)
   }
-  return { text: draftText(drafts), drafts, steps, meta }
+  return { text: draftText(drafts), drafts, steps, meta, facts }
 }
