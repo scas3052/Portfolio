@@ -1,4 +1,4 @@
-# Jalli Gopichand — Developer Portfolio 
+# Jalli Gopichand — Developer Portfolio
 
 A modern, responsive and animated personal portfolio built with **React 19** and **Vite**.
 
