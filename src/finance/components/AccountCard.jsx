@@ -1,16 +1,23 @@
 import { useMemo, useState } from 'react'
-import { LuArrowDownLeft, LuArrowUpRight, LuPencil, LuRotateCcw } from 'react-icons/lu'
+import { LuArrowDownLeft, LuArrowUpRight, LuPencil, LuReceipt, LuRotateCcw } from 'react-icons/lu'
 import { accountKindLabel, KIND_ICONS } from '../lib/categories'
 import { cx, toneVar } from '../lib/cx'
-import { shortMonth } from '../lib/dates'
+import { shortDate, shortMonth } from '../lib/dates'
 import { round2 } from '../lib/format'
+import { navigate } from '../lib/router'
 import { accountFlow } from '../lib/selectors'
 import { useFinance, useUi } from '../store/contexts'
 import { Money } from './Money'
 
+function billLabel(bill) {
+  if (bill.overdue) return `Overdue since ${shortDate(bill.dueDate)}`
+  if (bill.billDue > 0) return bill.daysToDue === 0 ? 'Bill due today' : `Bill due by ${shortDate(bill.dueDate)}`
+  return bill.billed > 0 ? 'Bill paid' : 'No bill due'
+}
+
 /** A bank-card shaped tile. Tap to flip and see this month's money in and out. */
 export function AccountCard({ account, balance, index = 0 }) {
-  const { state } = useFinance()
+  const { state, derived } = useFinance()
   const { currentMonth, openSheet } = useUi()
   const [flipped, setFlipped] = useState(false)
   const flow = useMemo(
@@ -19,6 +26,8 @@ export function AccountCard({ account, balance, index = 0 }) {
   )
   const Icon = KIND_ICONS[account.kind] || KIND_ICONS.savings
   const credit = account.kind === 'credit'
+  // A card paid beyond its dues has nothing billed, so it keeps the plain balance view.
+  const bill = credit && balance <= 0 ? derived.cardBills.get(account.id) : null
   const net = round2(flow.inflow - flow.outflow)
 
   return (
@@ -42,10 +51,26 @@ export function AccountCard({ account, balance, index = 0 }) {
             {account.bank && <span className="g-card__bank">{account.bank}</span>}
           </span>
           {account.kind !== 'cash' && account.kind !== 'wallet' && <span className="g-card__chip" aria-hidden="true" />}
-          <span className="g-card__balance">
-            <span className="g-card__label">{credit ? 'Card dues' : 'Balance'}</span>
-            <Money value={balance} tone={balance < 0 ? 'neg' : undefined} />
-          </span>
+          {bill ? (
+            <span className="g-card__balance">
+              <span className="g-card__label">{billLabel(bill)}</span>
+              <Money value={-bill.billDue} tone={bill.billDue > 0 ? 'neg' : undefined} />
+              <span className="g-card__sub">
+                {bill.unbilled > 0 ? (
+                  <>
+                    Unbilled <Money value={bill.unbilled} /> · next bill {shortDate(bill.nextStatement)}
+                  </>
+                ) : (
+                  <>Next bill {shortDate(bill.nextStatement)}</>
+                )}
+              </span>
+            </span>
+          ) : (
+            <span className="g-card__balance">
+              <span className="g-card__label">{credit ? 'Card dues' : 'Balance'}</span>
+              <Money value={balance} tone={balance < 0 ? 'neg' : undefined} />
+            </span>
+          )}
           <span className="g-card__bottom">
             <span className="g-card__name">{account.name}</span>
             {account.last4 && <span className="g-card__digits">•••• {account.last4}</span>}
@@ -83,6 +108,15 @@ export function AccountCard({ account, balance, index = 0 }) {
             <button type="button" className="g-btn g-btn--sm g-press" onClick={() => openSheet('account', { account })}>
               <LuPencil aria-hidden="true" /> Edit
             </button>
+            {credit && (
+              <button
+                type="button"
+                className="g-btn g-btn--sm g-press"
+                onClick={() => navigate('activity', { account: account.id })}
+              >
+                <LuReceipt aria-hidden="true" /> Statements
+              </button>
+            )}
             <button
               type="button"
               className="g-btn g-btn--sm g-btn--ghost g-press"

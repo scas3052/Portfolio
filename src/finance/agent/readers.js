@@ -42,10 +42,17 @@ function getOverview(args, { state, derived, today }) {
     out.emisDue = derived.loans
       .filter((l) => !l.done && !l.paidThisMonth && l.nextDue && monthOf(l.nextDue) <= month)
       .map((l) => ({ loan: l.loan.name, emi: l.loan.emi, due: l.nextDue }))
+    if (derived.cardBills.size) {
+      out.cardBillsDue = [...derived.cardBills]
+        .filter(([, bill]) => bill.billDue > 0)
+        .map(([id, bill]) => ({ card: derived.lookups.accounts.get(id).name, amount: bill.billDue, due: bill.dueDate, ...(bill.overdue ? { overdue: true } : {}) }))
+    }
   }
   out.accountsNow = state.accounts.map((a) => ({ name: a.name, kind: a.kind, balance: round2(derived.balances.get(a.id) || 0) }))
   const p = derived.position
   out.positionNow = { cash: p.cash, creditCardDue: round2(Math.max(0, -p.credit)), owedToYou: p.receivable, youOwe: p.payable, emiLeft: p.emiLeft, netWorth: p.net }
+  // With bill cycles, card dues split into generated bills and spends waiting for the next bill.
+  if (derived.cardBills.size) Object.assign(out.positionNow, { cardBillsDue: p.billDue, cardUnbilled: p.unbilled })
   out.budgetsAtRisk = budgetStatus(state.budgets, s.byCategory)
     .filter((b) => b.ratio >= 0.8)
     .map((b) => ({ category: b.meta.label, limit: b.limit, spent: b.spent }))
@@ -227,10 +234,23 @@ function getAccounts(args, { state, derived, today }) {
     if (a.bank) row.bank = a.bank
     if (a.last4) row.last4 = a.last4
     row.balance = balance
-    if (a.kind === 'credit') row.due = round2(Math.max(0, -balance))
+    if (a.kind === 'credit') {
+      row.due = round2(Math.max(0, -balance))
+      const bill = derived.cardBills.get(a.id)
+      if (bill) {
+        row.lastBill = { on: bill.statement, amount: bill.billed, leftToPay: bill.billDue, payBy: bill.dueDate }
+        if (bill.overdue) row.lastBill.overdue = true
+        row.unbilled = bill.unbilled
+        row.nextBillOn = bill.nextStatement
+      } else {
+        row.billCycle = 'not set (Accounts → tap the card → Edit)'
+      }
+    }
     return { ...row, inThisMonth: flow.inflow, outThisMonth: flow.outflow }
   })
-  return { month, accounts, totals: { cash: derived.position.cash, creditDue: round2(Math.max(0, -derived.position.credit)) } }
+  const totals = { cash: derived.position.cash, creditDue: round2(Math.max(0, -derived.position.credit)) }
+  if (derived.cardBills.size) Object.assign(totals, { cardBillsDue: derived.position.billDue, unbilled: derived.position.unbilled })
+  return { month, accounts, totals }
 }
 
 function personRow(p) {

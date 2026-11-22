@@ -235,6 +235,98 @@ export function loanStatus(loan, transactions, today) {
   }
 }
 
+function hasBillCycle(account) {
+  return account.kind === 'credit' && Boolean(account.statementDay) && Boolean(account.dueDay)
+}
+
+/** How a transaction moves this account's balance (0 when it doesn't touch it). */
+function accountMove(account, t) {
+  if (t.type === 'transfer') {
+    return (t.toAccountId === account.id ? t.amount : 0) - (t.accountId === account.id ? t.amount : 0)
+  }
+  return t.accountId === account.id ? (ACCOUNT_SIGN[t.type] || 0) * t.amount : 0
+}
+
+function lastStatementDate(account, today) {
+  const thisMonth = monthOf(today)
+  const statement = dateInMonth(thisMonth, account.statementDay)
+  return statement > today ? dateInMonth(addMonths(thisMonth, -1), account.statementDay) : statement
+}
+
+/** The payment date for the bill generated on `statement`. */
+function dueDateFor(account, statement) {
+  const billMonth = monthOf(statement)
+  const dueDate = dateInMonth(billMonth, account.dueDay)
+  return dueDate <= statement ? dateInMonth(addMonths(billMonth, 1), account.dueDay) : dueDate
+}
+
+/**
+ * A card's statements, newest first: the open one still collecting spends, then each closed bill back to the
+ * card's first entry. A statement covers the day after the previous bill date up to and including its own.
+ */
+export function statementPeriods(account, transactions, today, limit = 24) {
+  if (!hasBillCycle(account)) return []
+  const billMonth = monthOf(lastStatementDate(account, today))
+  const touching = transactions.filter((t) => accountMove(account, t) !== 0)
+  const first = touching.reduce((min, t) => (t.date < min ? t.date : min), today)
+
+  const periods = []
+  for (let i = 0; i < limit; i += 1) {
+    const end = dateInMonth(addMonths(billMonth, 1 - i), account.statementDay)
+    if (i > 0 && end < first) break
+    const start = addDays(dateInMonth(addMonths(billMonth, -i), account.statementDay), 1)
+    const period = { start, end, closed: i > 0, dueDate: dueDateFor(account, end), billed: 0 }
+    if (period.closed) {
+      let atStatement = account.opening
+      for (const t of touching) if (t.date <= end) atStatement += accountMove(account, t)
+      period.billed = round2(Math.max(0, -atStatement))
+    }
+    periods.push(period)
+  }
+  return periods
+}
+
+/**
+ * Where a credit card stands in its billing cycle, or null when the card has no bill/due days.
+ * Spends up to and including the statement date make up the bill; later spends wait for the next one.
+ * Payments and refunds after the statement date pay the bill down first.
+ */
+export function cardBill(account, transactions, today) {
+  if (!hasBillCycle(account)) return null
+  const statement = lastStatementDate(account, today)
+  const billMonth = monthOf(statement)
+  const nextStatement = dateInMonth(addMonths(billMonth, 1), account.statementDay)
+  const dueDate = dueDateFor(account, statement)
+
+  let atStatement = account.opening
+  let now = account.opening
+  let paidSince = 0
+  for (const t of transactions) {
+    const move = accountMove(account, t)
+    if (!move) continue
+    now += move
+    if (t.date <= statement) atStatement += move
+    else if (move > 0) paidSince += move
+  }
+
+  const billed = round2(Math.max(0, -atStatement))
+  const billDue = round2(Math.max(0, billed - paidSince))
+  const totalDue = round2(Math.max(0, -now))
+  const daysToDue = diffDays(today, dueDate)
+  return {
+    statement,
+    nextStatement,
+    dueDate,
+    billed,
+    paidSince: round2(paidSince),
+    billDue,
+    unbilled: round2(Math.max(0, totalDue - billDue)),
+    totalDue,
+    daysToDue,
+    overdue: billDue > EPS && daysToDue < 0,
+  }
+}
+
 export function budgetStatus(budgets, byCategory) {
   return Object.entries(budgets)
     .map(([id, limit]) => {
@@ -360,17 +452,35 @@ export function deriveAll(state, today) {
   const people = computePeople(state.people, state.transactions)
   const owe = peopleTotals(people)
   const loans = state.loans.map((loan) => loanStatus(loan, state.transactions, today))
+  const cardBills = new Map()
   let cash = 0
   let credit = 0
+  // Card dues split into the generated bill(s) and spends waiting for the next one.
+  // Cards without bill/due days count wholly as billed.
+  let billDue = 0
+  let unbilled = 0
   for (const account of state.accounts) {
     const balance = balances.get(account.id) || 0
-    if (account.kind === 'credit') credit += balance
-    else cash += balance
+    if (account.kind !== 'credit') {
+      cash += balance
+      continue
+    }
+    credit += balance
+    const bill = cardBill(account, state.transactions, today)
+    if (bill) {
+      cardBills.set(account.id, bill)
+      billDue += bill.billDue
+      unbilled += bill.unbilled
+    } else {
+      billDue += Math.max(0, -balance)
+    }
   }
   const emiLeft = round2(loans.reduce((sum, status) => sum + status.left, 0))
   const position = {
     cash: round2(cash),
     credit: round2(credit),
+    billDue: round2(billDue),
+    unbilled: round2(unbilled),
     receivable: owe.receivable,
     payable: owe.payable,
     emiLeft,
@@ -383,5 +493,5 @@ export function deriveAll(state, today) {
   }
   const sorted = sortTxns(state.transactions)
   const firstMonth = sorted.length ? monthOf(sorted[sorted.length - 1].date) : monthOf(today)
-  return { balances, people, owe, loans, position, lookups, sorted, firstMonth }
+  return { balances, cardBills, people, owe, loans, position, lookups, sorted, firstMonth }
 }

@@ -100,6 +100,10 @@ test('setup cards preview the new account, loan or jar', () => {
   })
   const card = setup({ kind: 'account', name: 'HDFC Millennia', accountKind: 'credit', balance: -2500 })
   assert.deepEqual([card.amount, card.caption, card.rows[1]], [2500, 'due on the card', ['Kind', 'Credit card']])
+  assert.deepEqual(setup({ kind: 'account', name: 'HDFC Millennia', accountKind: 'credit', statementDay: 20, dueDay: 5 }).rows.slice(2), [
+    ['Bill on', '20 of each month'],
+    ['Due on', '5 of each month'],
+  ])
 
   assert.deepEqual(setup({ kind: 'loan', name: 'Car loan', emi: 12000, tenure: 60, lender: 'HDFC', startMonth: '2026-12', dueDay: 5, account: 'hdfc' }).rows, [
     ['Name', 'Car loan'],

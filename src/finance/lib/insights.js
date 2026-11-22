@@ -114,6 +114,39 @@ export function buildInsights(state, derived, today) {
     }
   }
 
+  // Credit card bills: overdue first, then anything due within a week.
+  for (const [accountId, bill] of derived.cardBills) {
+    if (!(bill.billDue > 0)) continue
+    const { name } = derived.lookups.accounts.get(accountId)
+    const action = { label: 'Pay the bill', kind: 'paycard', accountId, amount: bill.billDue }
+    if (bill.overdue) {
+      cards.push({
+        id: `card-late-${accountId}`,
+        tone: 'coral',
+        icon: LuSiren,
+        kicker: 'Card bill overdue',
+        title: `${name} bill was due ${inDays(bill.daysToDue)}`,
+        body: `${formatINR(bill.billDue)} from the ${shortDate(bill.statement)} bill is still unpaid. Pay it to stop interest and late fees.`,
+        action,
+        priority: 100,
+      })
+    } else if (bill.daysToDue <= 7) {
+      cards.push({
+        id: `card-soon-${accountId}`,
+        tone: 'butter',
+        icon: LuCalendarClock,
+        kicker: 'Card bill due',
+        title: `${name}: ${formatINR(bill.billDue)} due ${inDays(bill.daysToDue)}`,
+        body:
+          bill.unbilled > 0
+            ? `From the ${shortDate(bill.statement)} bill. The ${formatINR(bill.unbilled)} spent since goes on the ${shortDate(bill.nextStatement)} bill.`
+            : `From the ${shortDate(bill.statement)} bill. New spends go on the ${shortDate(bill.nextStatement)} bill.`,
+        action,
+        priority: 90 - bill.daysToDue,
+      })
+    }
+  }
+
   // Budgets.
   const budgets = budgetStatus(state.budgets, now.byCategory)
   let budgetCards = 0

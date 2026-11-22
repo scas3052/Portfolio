@@ -135,6 +135,18 @@ test('setup drafts create accounts and goals, but not half-filled loans', () => 
   assert.deepEqual(commitDraft(makeCtx(), null), { ok: false, error: 'Unknown draft.' })
 })
 
+test('a card set up with bill and due days keeps them, and a bad day is refused', () => {
+  const ctx = makeCtx()
+  const card = draftFor(ctx, 'propose_setup', { kind: 'account', name: 'HDFC credit card', statementDay: 20, dueDay: 5 })
+  assert.equal(commitDraft(ctx, card).ok, true)
+  const saved = ctx.state.accounts.at(-1)
+  assert.deepEqual([saved.kind, saved.statementDay, saved.dueDay], ['credit', 20, 5])
+
+  const edited = (prefill) => ({ ...card, data: { ...card.data, prefill: { ...card.data.prefill, ...prefill } } })
+  assert.deepEqual(commitDraft(makeCtx(), edited({ statementDay: 0 })), { ok: false, error: 'Bill day should be 1 to 31.' })
+  assert.deepEqual(commitDraft(makeCtx(), edited({ dueDay: '' })), { ok: false, error: 'Due day should be 1 to 31.' })
+})
+
 test('Confirm all saves what it can with one toast, and Undo all reverses everything', () => {
   const ctx = makeCtx()
   const { transactions, people } = ctx.state

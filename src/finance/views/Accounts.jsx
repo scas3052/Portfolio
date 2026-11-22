@@ -6,6 +6,7 @@ import { Money, Odometer } from '../components/Money'
 import { TxnMiniList } from '../components/TxnRow'
 import { useActions } from '../hooks/useActions'
 import { toneVar } from '../lib/cx'
+import { shortDate } from '../lib/dates'
 import { formatPercent, plural, round2 } from '../lib/format'
 import { useFinance, useUi } from '../store/contexts'
 
@@ -38,6 +39,10 @@ export default function Accounts() {
     [derived.sorted],
   )
   const dues = Math.max(0, -position.credit)
+  const hasCycles = derived.cardBills.size > 0
+  const firstDue = [...derived.cardBills.values()]
+    .filter((bill) => bill.billDue > 0)
+    .reduce((first, bill) => (!first || bill.dueDate < first.dueDate ? bill : first), null)
 
   const headerActions = (
     <>
@@ -83,12 +88,35 @@ export default function Accounts() {
         <Tile span={5} index={0} tone="butter" icon={LuWallet} kicker="Across every account" title="Cash on hand" className="g-hero">
           <Odometer value={position.cash} className="g-hero__value" />
           <dl className="g-stats g-stats--wide">
-            <div>
-              <dt>Card dues</dt>
-              <dd>
-                <Money value={dues} tone={dues > 0 ? 'neg' : undefined} />
-              </dd>
-            </div>
+            {hasCycles ? (
+              <>
+                <div>
+                  <dt>Card bills due</dt>
+                  <dd>
+                    <Money value={position.billDue} tone={position.billDue > 0 ? 'neg' : undefined} />
+                    {firstDue && (
+                      <small>
+                        {firstDue.overdue ? 'Overdue since' : 'Next by'} {shortDate(firstDue.dueDate)}
+                      </small>
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Unbilled</dt>
+                  <dd>
+                    <Money value={position.unbilled} />
+                    <small>Goes on the next bill</small>
+                  </dd>
+                </div>
+              </>
+            ) : (
+              <div>
+                <dt>Card dues</dt>
+                <dd>
+                  <Money value={dues} tone={dues > 0 ? 'neg' : undefined} />
+                </dd>
+              </div>
+            )}
             <div className="g-stats__total">
               <dt>After paying cards</dt>
               <dd>

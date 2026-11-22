@@ -63,6 +63,14 @@ export function useActions() {
       case 'emi':
         addEntry({ type: 'emi', loanId: action.loanId })
         break
+      case 'paycard': {
+        // Pay from wherever this card was last paid from; otherwise the form picks.
+        const last = derived.sorted.find(
+          (t) => t.type === 'transfer' && t.toAccountId === action.accountId && derived.lookups.accounts.has(t.accountId),
+        )
+        addEntry({ type: 'transfer', accountId: last?.accountId, toAccountId: action.accountId, amount: action.amount })
+        break
+      }
       case 'collect':
       case 'repay': {
         const person = derived.people.find((p) => p.id === action.personId)

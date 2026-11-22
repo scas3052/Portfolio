@@ -68,6 +68,12 @@ function setupView(setup, prefill, ctx) {
         ['Kind', accountKindLabel(p.kind)],
         ...(p.bank ? [['Bank', p.bank]] : []),
         ...(p.last4 ? [['Ends in', p.last4]] : []),
+        ...(credit && p.statementDay && p.dueDay
+          ? [
+              ['Bill on', `${p.statementDay} of each month`],
+              ['Due on', `${p.dueDay} of each month`],
+            ]
+          : []),
       ],
     }
   }

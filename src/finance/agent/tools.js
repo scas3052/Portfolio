@@ -54,7 +54,7 @@ export const TOOLS = {
     parameters: obj({ expression: str('e.g. "(45000-12000)/3" or "18% of 2500"') }, ['expression']),
   },
   get_accounts: {
-    description: 'Accounts with balances and this month’s money in/out.',
+    description: 'Accounts with balances, this month’s money in/out, and each credit card’s last bill, due date and unbilled spends.',
     parameters: obj({}),
   },
   get_people: {
@@ -108,7 +108,8 @@ export const TOOLS = {
         tenure: num('Total EMIs'),
         paidBefore: num('EMIs already paid'),
         startMonth: str('YYYY-MM of first EMI'),
-        dueDay: num('Day of month EMI is due'),
+        statementDay: num('Credit card: day of month the bill is generated'),
+        dueDay: num('Day of month the EMI or card bill is due'),
         rate: num('Interest % a year'),
         principal: num('Loan amount'),
         account: str('Account EMIs are paid from'),

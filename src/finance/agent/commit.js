@@ -181,6 +181,8 @@ function commitContribution({ state, dispatch, ui }, { goalId, amount }, quiet) 
 }
 
 const whole = (value) => (typeof value === 'number' ? value : /^\d+$/.test(String(value).trim()) ? Number(value) : NaN)
+const given = (value) => value !== '' && value != null
+const isDay = (value) => Number.isInteger(whole(value)) && whole(value) >= 1 && whole(value) <= 31
 
 /** Same rules as the account, loan and goal forms. Returns {field: message}. */
 export function validateSetup(kind, prefill, { state, today }) {
@@ -191,6 +193,11 @@ export function validateSetup(kind, prefill, { state, today }) {
     if (!ACCOUNT_KINDS.some((k) => k.id === p.kind)) errors.kind = 'Pick the kind of account.'
     if (!Number.isFinite(Number(p.opening)) || Math.abs(Number(p.opening)) >= 1e10) errors.opening = 'That balance doesn’t work.'
     if (p.last4 && !/^\d{4}$/.test(p.last4)) errors.last4 = 'Four digits, or leave it empty.'
+    // A card's bill cycle is optional, but needs both days.
+    if (p.kind === 'credit' && (given(p.statementDay) || given(p.dueDay))) {
+      if (!isDay(p.statementDay)) errors.statementDay = 'Bill day should be 1 to 31.'
+      if (!isDay(p.dueDay)) errors.dueDay = 'Due day should be 1 to 31.'
+    }
   } else if (kind === 'loan') {
     const tenure = whole(p.tenure)
     const paidBefore = p.paidBefore === '' || p.paidBefore == null ? 0 : whole(p.paidBefore)
@@ -235,6 +242,9 @@ function commitSetup(ctx, kind, prefill, quiet) {
       last4: banked ? prefill.last4 || '' : '',
       opening: round2(Number(prefill.opening) || 0),
       color: nextTone('account', state),
+      ...(prefill.kind === 'credit' && isDay(prefill.statementDay) && isDay(prefill.dueDay)
+        ? { statementDay: whole(prefill.statementDay), dueDay: whole(prefill.dueDay) }
+        : {}),
     }
     dispatch({ type: 'account/add', account })
     undo = () => dispatch({ type: 'account/delete', id: account.id })

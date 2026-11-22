@@ -18,13 +18,19 @@ import { Money } from '../components/Money'
 import { TxnList } from '../components/TxnRow'
 import { useActions } from '../hooks/useActions'
 import { PEOPLE_TYPES } from '../lib/categories'
-import { formatDay, isISODate, monthLabel } from '../lib/dates'
+import { formatDay, isISODate, monthLabel, shortDate } from '../lib/dates'
 import { plural, round2 } from '../lib/format'
 import { navigate } from '../lib/router'
-import { searchText, signedAmount } from '../lib/selectors'
+import { searchText, signedAmount, statementPeriods } from '../lib/selectors'
 import { useFinance, useUi } from '../store/contexts'
 
 const PAGE = 60
+
+function statementName(period, index) {
+  const range = `${shortDate(period.start)} – ${shortDate(period.end)}`
+  if (!period.closed) return `Current statement · ${range}`
+  return index === 1 ? `Previous statement · ${range}` : `Statement · ${range}`
+}
 
 const FILTERS = [
   { value: 'all', label: 'All', icon: LuList },
@@ -42,18 +48,27 @@ function matchesType(txn, type) {
 }
 
 export default function Activity({ params }) {
-  const { state, derived } = useFinance()
+  const { state, derived, today } = useFinance()
   const { month } = useUi()
   const { addEntry } = useActions()
   const [type, setType] = useState('all')
   const [query, setQuery] = useState('')
-  const [account, setAccount] = useState('')
+  const [account, setAccount] = useState(() =>
+    state.accounts.some((item) => item.id === params?.account) ? params.account : '',
+  )
+  const [statementEnd, setStatementEnd] = useState('')
   const deferredQuery = useDeferredValue(query)
+
+  const periods = useMemo(() => {
+    const card = state.accounts.find((item) => item.id === account)
+    return card ? statementPeriods(card, state.transactions, today) : []
+  }, [state.accounts, state.transactions, account, today])
+  const period = periods.find((item) => item.end === statementEnd) || null
 
   const day = isISODate(params?.day) ? params.day : ''
   const termsKey = deferredQuery.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ')
   const searching = termsKey !== ''
-  const filterKey = [day, month, type, account, termsKey].join('|')
+  const filterKey = [day, month, type, account, period?.end, termsKey].join('|')
   const filtered = Boolean(day || searching || type !== 'all' || account)
 
   const results = useMemo(() => {
@@ -61,8 +76,8 @@ export default function Activity({ params }) {
     return derived.sorted.filter((txn) => {
       if (day) {
         if (txn.date !== day) return false
-      } else if (!words.length && !txn.date.startsWith(month)) {
-        return false
+      } else if (!words.length) {
+        if (period ? txn.date < period.start || txn.date > period.end : !txn.date.startsWith(month)) return false
       }
       if (!matchesType(txn, type)) return false
       if (account && txn.accountId !== account && txn.toAccountId !== account) return false
@@ -72,7 +87,7 @@ export default function Activity({ params }) {
       }
       return true
     })
-  }, [derived.sorted, derived.lookups, day, month, type, account, termsKey])
+  }, [derived.sorted, derived.lookups, day, month, period, type, account, termsKey])
 
   const totals = useMemo(() => {
     let inflow = 0
@@ -94,12 +109,15 @@ export default function Activity({ params }) {
     ? formatDay(day, { year: true })
     : searching
       ? 'every month'
-      : monthLabel(month)
+      : period
+        ? `${shortDate(period.start)} – ${shortDate(period.end)}`
+        : monthLabel(month)
 
   const clearAll = () => {
     setType('all')
     setQuery('')
     setAccount('')
+    setStatementEnd('')
     if (day) navigate('activity')
   }
 
@@ -139,11 +157,31 @@ export default function Activity({ params }) {
         {state.accounts.length > 0 && (
           <label className="g-filters__account">
             <span className="sr-only">Account</span>
-            <select className="g-select" value={account} onChange={(event) => setAccount(event.target.value)}>
+            <select
+              className="g-select"
+              value={account}
+              onChange={(event) => {
+                setAccount(event.target.value)
+                setStatementEnd('')
+              }}
+            >
               <option value="">All accounts</option>
               {state.accounts.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {periods.length > 0 && (
+          <label className="g-filters__account">
+            <span className="sr-only">Statement</span>
+            <select className="g-select" value={statementEnd} onChange={(event) => setStatementEnd(event.target.value)}>
+              <option value="">By calendar month</option>
+              {periods.map((item, i) => (
+                <option key={item.end} value={item.end}>
+                  {statementName(item, i)}
                 </option>
               ))}
             </select>
@@ -157,6 +195,19 @@ export default function Activity({ params }) {
           size="sm"
           className="g-filters__types"
         />
+        {period && !day && (
+          <p className="g-filters__day">
+            <LuCalendarDays aria-hidden="true" />
+            {period.closed ? (
+              <>
+                Bill {shortDate(period.end)} · <Money value={-period.billed} tone={period.billed > 0 ? 'neg' : undefined} /> ·
+                due {shortDate(period.dueDate)}
+              </>
+            ) : (
+              <>Open statement · bill generates {shortDate(period.end)} · due {shortDate(period.dueDate)}</>
+            )}
+          </p>
+        )}
         {day && (
           <p className="g-filters__day">
             <LuCalendarDays aria-hidden="true" />
