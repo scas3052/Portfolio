@@ -1,0 +1,47 @@
+/* The Android app only (app/index.html sets data-gullak-app). Gullak draws edge to edge, so the top bar
+   and anything pinned to the top make room for the status bar; the bottom already uses the safe area. */
+html[data-gullak-app] {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+html[data-gullak-app] body::before {
+  content: '';
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 60;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--bg);
+  pointer-events: none;
+}
+
+html[data-gullak-app] .g-top {
+  top: env(safe-area-inset-top, 0px);
+}
+
+html[data-gullak-app] .g-stage {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+html[data-gullak-app] .g-sheet--bottom {
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - 12px);
+}
+
+html[data-gullak-app] .g-lock,
+html[data-gullak-app] .g-welcome {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* While the keyboard is up, the tab bar and Munshi's launcher step aside. */
+html[data-gullak-app][data-keyboard='open'] .g-tabs,
+html[data-gullak-app][data-keyboard='open'] .g-mk-launcher {
+  display: none;
+}
+
+/* Long-press text selection and the blue tap flash feel like a web page, not an app. */
+html[data-gullak-app] .g-tab,
+html[data-gullak-app] .g-btn,
+html[data-gullak-app] .g-icon-btn {
+  -webkit-user-select: none;
+  user-select: none;
+}

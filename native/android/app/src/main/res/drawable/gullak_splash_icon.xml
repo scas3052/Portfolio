@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launch screen icon: the full Gullak tile, sized to sit inside the splash screen's 192dp circle. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="288"
+    android:viewportHeight="288">
+    <group
+        android:scaleX="2.1"
+        android:scaleY="2.1"
+        android:translateX="76.8"
+        android:translateY="76.8">
+        <path
+            android:fillColor="#FF151515"
+            android:pathData="M16,0h32a16,16 0,0 1,16 16v32a16,16 0,0 1,-16 16h-32a16,16 0,0 1,-16 -16v-32a16,16 0,0 1,16 -16z" />
+        <path
+            android:fillColor="#FFC8F169"
+            android:pathData="M12,35C12,26 21,22 32,22s20,4 20,13v11c0,8 -8,11 -20,11s-20,-3 -20,-11z" />
+        <path
+            android:fillColor="#FF151515"
+            android:pathData="M27,27h10a2,2 0,0 1,2 2a2,2 0,0 1,-2 2h-10a2,2 0,0 1,-2 -2a2,2 0,0 1,2 -2z" />
+        <path
+            android:strokeColor="#FF151515"
+            android:strokeWidth="2.5"
+            android:pathData="M12,42h40" />
+        <path
+            android:fillColor="#FFF5C542"
+            android:pathData="M25,12a7,7 0,1 0,14 0a7,7 0,1 0,-14 0z" />
+    </group>
+</vector>

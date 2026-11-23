@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="gullak_paper">#F2EEE3</color>
+    <color name="gullak_ink">#151515</color>
+    <color name="gullak_lime">#C8F169</color>
+    <color name="gullak_gold">#F5C542</color>
+    <color name="gullak_icon_background">#151515</color>
+</resources>

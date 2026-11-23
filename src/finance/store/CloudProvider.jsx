@@ -4,14 +4,17 @@ import { cloudAvailable, firebaseConfig } from '../cloud/config'
 import { createCloudController } from '../cloud/controller'
 import { CloudContext, useFinance, useUi } from './contexts'
 
-// The Firebase SDK is a separate chunk that only loads once sync is in use.
-const loadApi = () => import('../cloud/firebase').then((module) => module.connect(firebaseConfig))
+// The Firebase SDK is a separate chunk that only loads once sync is in use. In the Android app,
+// `nativeAuth` signs in with the phone's Google account picker instead of a popup.
+const apiLoader = (nativeAuth) => () => import('../cloud/firebase').then((module) => module.connect(firebaseConfig, { nativeAuth }))
 
 /** Cloud sync: links this browser to a Google account and keeps its book in step with the cloud. */
-export default function CloudProvider({ children }) {
+export default function CloudProvider({ nativeAuth = null, children }) {
   const { bridge, dispatch } = useFinance()
   const { sheet, openSheet, closeSheet, toast, unlock, setAgentOpen } = useUi()
-  const [controller] = useState(() => createCloudController({ available: cloudAvailable, loadApi, bridge, dispatch }))
+  const [controller] = useState(() =>
+    createCloudController({ available: cloudAvailable, loadApi: apiLoader(nativeAuth), bridge, dispatch }),
+  )
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
 
   useEffect(() => {

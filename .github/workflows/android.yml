@@ -1,0 +1,209 @@
+# Builds Gullak's Android app.
+#
+# - On a push or pull request touching the app: lint, node tests, both web builds, the Java parser tests, then a
+#   signed APK attached to the run as an artifact (release-signed once "Android signing key" has been run, debug
+#   key until then).
+# - Run it by hand (Actions → Android app → Run workflow) or push a gullak-v* tag (e.g. gullak-v1.2.0) to also
+#   publish the APK to Vercel Blob, where the site's "Get the Android app" button and the app's update check find it.
+#
+# Setup (README → Android app): secrets ANDROID_KEYSTORE_PASSWORD, ANDROID_KEYSTORE_BASE64, BLOB_READ_WRITE_TOKEN;
+# variables VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, VITE_FIREBASE_APP_ID,
+# VITE_GOOGLE_WEB_CLIENT_ID, GULLAK_SITE_URL.
+name: Android app
+
+on:
+  push:
+    branches: ['**']
+    tags: ['gullak-v*']
+    paths:
+      - 'src/finance/**'
+      - 'app/**'
+      - 'native/**'
+      - 'api/**'
+      - 'server/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'capacitor.config.json'
+      - 'vite.app.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android.yml'
+  pull_request:
+    paths:
+      - 'src/finance/**'
+      - 'app/**'
+      - 'native/**'
+      - 'api/**'
+      - 'server/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'capacitor.config.json'
+      - 'vite.app.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish this build to the Gullak site
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  apk:
+    name: Build the APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      PUBLISH: ${{ (github.event_name == 'workflow_dispatch' && inputs.publish) || startsWith(github.ref, 'refs/tags/gullak-v') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm install` rather than `npm ci`, so a lockfile that's behind package.json doesn't stop the build.
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Node tests
+        run: npm test
+
+      - name: Build the website (unchanged by the app)
+        run: npm run build
+
+      - name: Version
+        id: version
+        run: |
+          code="${GITHUB_RUN_NUMBER}"
+          if [[ "$GITHUB_REF" == refs/tags/gullak-v* ]]; then
+            name="${GITHUB_REF#refs/tags/gullak-v}"
+          else
+            name="1.0.${code}"
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Gullak $name ($code)"
+
+      - name: Build the app bundle
+        env:
+          VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+          VITE_GOOGLE_WEB_CLIENT_ID: ${{ vars.VITE_GOOGLE_WEB_CLIENT_ID }}
+          GULLAK_SITE_URL: ${{ vars.GULLAK_SITE_URL }}
+        run: |
+          site="${GULLAK_SITE_URL%/}"
+          if [ -n "$site" ]; then
+            # The app runs from https://localhost, so Munshi and the update check need the site's full address.
+            export VITE_GULLAK_SITE_URL="$site"
+            export VITE_AGENT_ENDPOINT="$site/api/agent"
+          else
+            echo "::warning::The GULLAK_SITE_URL variable isn't set, so Munshi and update checks won't work in this build."
+          fi
+          [ -n "$VITE_FIREBASE_API_KEY" ] || echo "::warning::The VITE_FIREBASE_* variables aren't set, so sign-in and sync are off in this build."
+          [ -n "$VITE_GOOGLE_WEB_CLIENT_ID" ] || echo "::warning::VITE_GOOGLE_WEB_CLIENT_ID isn't set, so Google sign-in won't work in this build."
+          npm run build:app
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Create the Android project
+        run: |
+          npm run android:prepare
+          chmod +x android/gradlew
+
+      - name: Load the signing key
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/gullak-release.jks"
+            echo "GULLAK_KEYSTORE_FILE=$RUNNER_TEMP/gullak-release.jks" >> "$GITHUB_ENV"
+            echo "signed=release" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No release key yet (run the 'Android signing key' workflow), so this APK is signed with a debug key. Fine to try, but it can't be updated by later release builds."
+            echo "signed=debug" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Java tests and APK
+        working-directory: android
+        env:
+          GULLAK_VERSION_CODE: ${{ steps.version.outputs.code }}
+          GULLAK_VERSION_NAME: ${{ steps.version.outputs.name }}
+          GULLAK_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
+
+      - name: Check the APK's signature
+        id: apk
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          SIGNED: ${{ steps.key.outputs.signed }}
+        run: |
+          apk="gullak-${VERSION_NAME}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$apk"
+          tools=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -n 1)
+          "${tools}apksigner" verify --print-certs "$apk" | grep -E 'SHA-(1|256) digest' > certs.txt
+          cat certs.txt
+          echo "file=$apk" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Gullak ${VERSION_NAME} (${VERSION_CODE})"
+            echo
+            echo "- Signed with the **${SIGNED}** key"
+            echo "- APK SHA-256: \`$(sha256sum "$apk" | cut -d' ' -f1)\`"
+            echo "- Size: $(du -h "$apk" | cut -f1)"
+            echo
+            echo '```'
+            cat certs.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gullak-${{ steps.version.outputs.name }}
+          path: ${{ steps.apk.outputs.file }}
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Publish to the Gullak site
+        if: env.PUBLISH == 'true'
+        env:
+          BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+          SIGNED: ${{ steps.key.outputs.signed }}
+          APK: ${{ steps.apk.outputs.file }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          if [ "$SIGNED" != "release" ]; then
+            echo "::error::Only release-signed builds are published. Run the 'Android signing key' workflow and save ANDROID_KEYSTORE_BASE64 first."
+            exit 1
+          fi
+          if [ -z "$BLOB_READ_WRITE_TOKEN" ]; then
+            echo "::error::Add the secret BLOB_READ_WRITE_TOKEN (Vercel → Storage → your Blob store → .env.local) to publish."
+            exit 1
+          fi
+          node scripts/upload-apk.mjs "$APK" --version-name "$VERSION_NAME" --version-code "$VERSION_CODE"
+
+      - name: Remove the key file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/gullak-release.jks"

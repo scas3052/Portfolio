@@ -1,0 +1,542 @@
+/* Captured payments (Android app only; imported by src/finance/app/main.jsx). */
+
+/* ---------- home notes ---------- */
+.g-inbox-notes {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.g-inbox-note {
+  --tone: var(--lime);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  font: 600 .9rem/1.4 var(--font-body);
+  color: var(--on-tone);
+  text-align: left;
+  text-decoration: none;
+  background: var(--tone);
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+
+.g-inbox-note--setup {
+  --tone: var(--butter);
+}
+
+.g-inbox-note--update {
+  --tone: var(--sky);
+}
+
+.g-inbox-note__count {
+  display: grid;
+  flex: none;
+  place-items: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 8px;
+  font: 800 1.1rem/1 var(--font-display);
+  color: var(--cream);
+  background: var(--coal);
+  border-radius: 999px;
+  rotate: -6deg;
+}
+
+.g-inbox-note__icon {
+  flex: none;
+  font-size: 1.4rem;
+}
+
+.g-inbox-note__text {
+  flex: 1;
+}
+
+.g-inbox-note__go {
+  flex: none;
+  font-size: 1.2rem;
+  transition: translate .2s var(--ease-out);
+}
+
+.g-inbox-note:hover .g-inbox-note__go {
+  translate: 4px 0;
+}
+
+/* ---------- review sheet ---------- */
+.g-inbox {
+  gap: 14px;
+}
+
+/* Long names truncate instead of widening the sheet past the screen. */
+.g-inbox,
+.g-inbox__list,
+.g-spend {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.g-spend {
+  min-width: 0;
+}
+
+.g-inbox__lead {
+  font-size: .86rem;
+  color: var(--ink-2);
+}
+
+.g-inbox__list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.g-inbox__foot {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+  font-size: .84rem;
+}
+
+.g-inbox__foot .g-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.g-spend {
+  --tone: var(--peach);
+  position: relative;
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--surface);
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  scroll-margin: 80px;
+}
+
+.g-spend::before {
+  content: '';
+  position: absolute;
+  inset: -2px auto -2px -2px;
+  width: 8px;
+  background: var(--tone);
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r) 0 0 var(--r);
+}
+
+.g-spend.is-focused {
+  box-shadow: var(--shadow-lg);
+  outline: 3px solid var(--tone);
+  outline-offset: 3px;
+}
+
+.g-spend__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-left: 6px;
+}
+
+.g-spend__badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  font-size: 1.1rem;
+  color: var(--on-tone);
+  background: var(--tone);
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r-sm);
+}
+
+.g-spend__who {
+  flex: 1;
+  min-width: 0;
+}
+
+.g-spend__name {
+  overflow: hidden;
+  font: 800 1.02rem/1.25 var(--font-display);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-spend__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+  font: 500 .74rem/1.4 var(--font-mono);
+  color: var(--ink-3);
+}
+
+.g-spend__sources {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.g-spend__source {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  font: 600 .66rem/1.5 var(--font-body);
+  color: var(--ink-2);
+  border: 1.5px solid var(--hair);
+  border-radius: 999px;
+}
+
+.g-spend__amount {
+  flex: none;
+  font: 800 1.15rem/1.2 var(--font-display);
+}
+
+.g-spend__account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 6px;
+  font: 600 .84rem/1.4 var(--font-body);
+}
+
+.g-spend__account > svg {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.g-spend__digits,
+.g-spend__muted {
+  color: var(--ink-3);
+}
+
+.g-spend__pick {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.g-spend__pick .g-select {
+  flex: 1 1 10rem;
+  min-height: 36px;
+  padding-block: 4px;
+}
+
+.g-spend__note {
+  display: flex;
+  gap: 8px;
+  margin-left: 6px;
+  padding: 8px 10px;
+  font: 600 .86rem/1.45 var(--font-body);
+  background: var(--surface-2);
+  border: 1.5px dashed var(--ink-3);
+  border-radius: var(--r-sm);
+}
+
+.g-spend__note > svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+/* "What was it for?" */
+.g-spend__ask {
+  display: grid;
+  gap: 6px;
+  padding-left: 6px;
+}
+
+.g-spend__ask label {
+  font: 800 .84rem/1.3 var(--font-display);
+}
+
+.g-spend__ask-row {
+  display: flex;
+  gap: 8px;
+}
+
+.g-spend__ask-row .g-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Same send button as Munshi's composer. */
+.g-spend__ask-row .g-icon-btn {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  font-size: 1.15rem;
+  color: var(--coal);
+  background: var(--lime);
+  border-radius: 12px;
+}
+
+.g-spend__ask-row .g-icon-btn:disabled {
+  color: var(--ink-3);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.g-spend__tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 6px;
+  font-size: .82rem;
+  color: var(--ink-2);
+}
+
+.g-spend__tip.is-learned {
+  color: var(--ink);
+}
+
+.g-spend__twin {
+  display: grid;
+  gap: 8px;
+  margin-left: 6px;
+  padding: 10px 12px;
+  font-size: .84rem;
+  background: color-mix(in srgb, var(--sky) 45%, var(--surface));
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r-sm);
+}
+
+.g-spend__twin .g-btn {
+  justify-self: start;
+}
+
+.g-spend__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-left: 6px;
+}
+
+.g-spend__munshi {
+  color: var(--cream);
+  background: #b3261e;
+}
+
+.g-spend__original {
+  padding-left: 6px;
+  font-size: .82rem;
+}
+
+.g-spend__fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.g-spend__fold[aria-expanded='true'] svg {
+  rotate: 180deg;
+}
+
+.g-spend__raw {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.g-spend__raw figure {
+  margin: 0;
+}
+
+.g-spend__raw figcaption {
+  font: 600 .7rem/1.4 var(--font-mono);
+  color: var(--ink-3);
+}
+
+.g-spend__raw blockquote {
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  font: 500 .78rem/1.5 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--surface-2);
+  border-left: 4px solid var(--tone);
+  border-radius: var(--r-xs);
+}
+
+/* ---------- Settings → Payment capture ---------- */
+.g-capture {
+  display: grid;
+  gap: 12px;
+}
+
+.g-capture__steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.g-capture__step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r-sm);
+}
+
+.g-capture__step.is-done {
+  background: color-mix(in srgb, var(--mint) 40%, var(--surface));
+}
+
+.g-capture__mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  font-size: 1.3rem;
+}
+
+.g-capture__what {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  font: 600 .9rem/1.3 var(--font-body);
+}
+
+.g-capture__what small {
+  font-size: .74rem;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.g-capture__ok {
+  font: 700 .74rem/1 var(--font-mono);
+  text-transform: uppercase;
+  color: var(--pos);
+}
+
+.g-capture__help {
+  --tone: var(--butter);
+}
+
+.g-capture__title {
+  font: 800 .95rem/1.2 var(--font-display);
+}
+
+.g-capture__learned {
+  display: grid;
+  gap: 8px;
+}
+
+.g-capture__rules {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.g-capture__rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.g-capture__payee {
+  flex: 1 1 8rem;
+  min-width: 0;
+  overflow: hidden;
+  font: 700 .86rem/1.3 var(--font-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-capture__is {
+  flex: 1 1 10rem;
+  font-size: .84rem;
+  color: var(--ink-2);
+}
+
+.g-capture__rule .g-select {
+  flex: 1 1 10rem;
+  min-height: 36px;
+  padding-block: 4px;
+}
+
+/* ---------- Munshi: a payment attached to the next message ---------- */
+.g-mk-focus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 8px;
+  padding: 6px 8px 6px 12px;
+  font: 600 .8rem/1.3 var(--font-body);
+  background: var(--butter);
+  color: var(--on-tone);
+  border: var(--bw) solid var(--frame);
+  border-radius: 999px;
+}
+
+.g-mk-focus__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-mk-focus__drop {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.g-mk-chit__chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font: 600 .72rem/1.3 var(--font-mono);
+  opacity: .75;
+}
+
+/* ---------- Home tab badge ---------- */
+.g-tab__icon {
+  position: relative;
+}
+
+.g-tab__badge {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font: 800 .62rem/1 var(--font-mono);
+  color: var(--cream);
+  background: #b3261e;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+}
+
+/* A transfer's title names both accounts; let it wrap rather than cut off where the money went. */
+.g-spend--pair .g-spend__name {
+  overflow: visible;
+  white-space: normal;
+}

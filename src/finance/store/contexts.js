@@ -3,6 +3,8 @@ import { createContext, useContext } from 'react'
 export const FinanceContext = createContext(null)
 export const UiContext = createContext(null)
 export const CloudContext = createContext(null)
+/** The Android app's extras (captured payments, native sharing, updates). Null on the website. */
+export const AppContext = createContext(null)
 
 const noop = () => {}
 
@@ -42,4 +44,9 @@ export function useUi() {
 
 export function useCloud() {
   return useContext(CloudContext) || CLOUD_OFF
+}
+
+/** The Android app's extras, or null when Gullak runs as the website. */
+export function useApp() {
+  return useContext(AppContext)
 }

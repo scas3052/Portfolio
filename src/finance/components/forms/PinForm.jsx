@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import { LuKeyRound, LuShieldOff } from 'react-icons/lu'
 import { cx } from '../../lib/cx'
 import { checkPin, hashPin, PIN_LENGTH } from '../../lib/pin'
+import { thisDevice } from '../../lib/where'
 import { useCloud, useFinance, useUi } from '../../store/contexts'
 import { Segmented } from '../bits'
 
@@ -161,7 +162,7 @@ export default function PinForm({ onDone }) {
         </p>
       ) : (
         <p className="g-callout">
-          The PIN hides Gullak from people using this device. It isn’t encryption: your data stays in this browser’s
+          The PIN hides Gullak from people using this device. It isn’t encryption: your data stays in {thisDevice()}’s
           storage. Gullak also locks itself after 2 minutes in the background.
         </p>
       )}

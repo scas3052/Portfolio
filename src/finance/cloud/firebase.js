@@ -9,7 +9,9 @@ import {
   indexedDBLocalPersistence,
   initializeAuth,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   reauthenticateWithPopup,
+  signInWithCredential,
   signInWithPopup,
   signOut as signOutOfAuth,
 } from 'firebase/auth'
@@ -44,8 +46,12 @@ function setIn(target, path, value) {
 
 const toMap = (docs) => new Map(docs.map((snap) => [snap.id, snap.data()]))
 
-/** Sets up the Firebase app, auth and (lazily) Firestore once, and returns what sync needs. */
-export function connect(config) {
+/**
+ * Sets up the Firebase app, auth and (lazily) Firestore once, and returns what sync needs.
+ * `nativeAuth` (Android app only) supplies Google ID tokens from the phone's account picker, since an
+ * app's web view can't open Google's sign-in popup.
+ */
+export function connect(config, { nativeAuth = null } = {}) {
   if (connection) return connection
 
   const app = getApps().find((item) => item.name === APP_NAME) || initializeApp(config, APP_NAME)
@@ -53,7 +59,7 @@ export function connect(config) {
   try {
     auth = initializeAuth(app, {
       persistence: [indexedDBLocalPersistence, browserLocalPersistence],
-      popupRedirectResolver: browserPopupRedirectResolver,
+      ...(nativeAuth ? {} : { popupRedirectResolver: browserPopupRedirectResolver }),
     })
   } catch {
     // Already set up (a hot reload during development).
@@ -61,6 +67,7 @@ export function connect(config) {
   }
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({ prompt: 'select_account' })
+  const googleCredential = () => nativeAuth.googleIdToken().then((idToken) => GoogleAuthProvider.credential(idToken))
 
   // The book already lives in localStorage, so Firestore keeps only a small in-memory cache.
   let db = null
@@ -123,13 +130,19 @@ export function connect(config) {
     onUser: (callback) => onAuthStateChanged(auth, callback),
     currentUser: () => auth.currentUser,
     authReady: () => auth.authStateReady(),
-    // Both open a popup, so call them straight from a click handler.
-    signIn: () => signInWithPopup(auth, provider).then((result) => result.user),
+    // On the web both open a popup, so call them straight from a click handler.
+    signIn: () => {
+      if (nativeAuth) return googleCredential().then((credential) => signInWithCredential(auth, credential)).then((result) => result.user)
+      return signInWithPopup(auth, provider).then((result) => result.user)
+    },
     reauth: () => {
       if (!auth.currentUser) return Promise.reject(Object.assign(new Error('Not signed in'), { code: 'auth/no-current-user' }))
-      return reauthenticateWithPopup(auth.currentUser, provider).then((result) => result.user)
+      const user = auth.currentUser
+      if (nativeAuth) return googleCredential().then((credential) => reauthenticateWithCredential(user, credential)).then((result) => result.user)
+      return reauthenticateWithPopup(user, provider).then((result) => result.user)
     },
-    signOut: () => signOutOfAuth(auth),
+    // Signing out of the app also forgets the Google account it picked, so the next sign-in asks again.
+    signOut: () => signOutOfAuth(auth).finally(() => nativeAuth?.signOut()),
     book,
     /** Resolves once queued writes reach the server; never resolves while offline. */
     waitForWrites: () => (db ? waitForPendingWrites(db) : Promise.resolve()),

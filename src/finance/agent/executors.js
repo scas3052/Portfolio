@@ -1,6 +1,7 @@
 // Runs one tool call against the current data. Reads answer immediately; writes only ever return drafts.
 import { parseJSON } from './parse'
 import { READERS } from './readers'
+import { SPEND_READERS, SPEND_WRITERS } from './spends'
 import { WRITERS } from './writers'
 
 export { draftEntries, entrySummary } from './entries'
@@ -16,6 +17,8 @@ export function executeTool(name, args, ctx) {
   try {
     if (Object.hasOwn(WRITERS, name)) return WRITERS[name](input, ctx)
     if (Object.hasOwn(READERS, name)) return { result: READERS[name](input, ctx), drafts: [] }
+    if (Object.hasOwn(SPEND_WRITERS, name)) return SPEND_WRITERS[name](input, ctx)
+    if (Object.hasOwn(SPEND_READERS, name)) return { result: SPEND_READERS[name](input, ctx), drafts: [] }
     return { result: { ok: false, error: `Unknown tool ${name}` }, drafts: [] }
   } catch (err) {
     return { result: { ok: false, error: `Tool failed: ${err?.message || err}` }, drafts: [] }

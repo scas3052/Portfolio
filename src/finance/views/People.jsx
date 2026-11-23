@@ -17,7 +17,7 @@ import { useActions } from '../hooks/useActions'
 import { cx, toneFor, toneVar } from '../lib/cx'
 import { diffDays, formatDay, shortDate } from '../lib/dates'
 import { formatINR, plural, round2 } from '../lib/format'
-import { useFinance, useUi } from '../store/contexts'
+import { useApp, useFinance, useUi } from '../store/contexts'
 
 const EPS = 0.005
 const MAX_TILT = 12
@@ -53,6 +53,7 @@ function Scale({ receivable, payable }) {
 function PersonCard({ person, index }) {
   const { today } = useFinance()
   const { openSheet, toast } = useUi()
+  const app = useApp()
   const { addEntry, settle } = useActions()
   const status = stateOf(person)
   const amount = Math.abs(person.net)
@@ -61,6 +62,10 @@ function PersonCard({ person, index }) {
   const nudge = async () => {
     const text = `Hi ${person.name}! Gentle reminder about the ${formatINR(amount)} from ${formatDay(person.since || person.last)}. No rush, whenever you can.`
     try {
+      if (app?.shareText) {
+        await app.shareText(text)
+        return
+      }
       if (navigator.share) {
         await navigator.share({ text })
         return

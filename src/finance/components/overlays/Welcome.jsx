@@ -16,7 +16,7 @@ import {
 import { useActions } from '../../hooks/useActions'
 import { toneVar } from '../../lib/cx'
 import { uid } from '../../lib/id'
-import { useCloud, useFinance, useUi } from '../../store/contexts'
+import { useApp, useCloud, useFinance, useUi } from '../../store/contexts'
 
 const FEATURES = [
   { icon: LuWalletCards, label: 'Every bank, card & wallet', tone: 'butter', rotate: -4 },
@@ -69,6 +69,7 @@ export default function Welcome() {
   const { goPortfolio } = useActions()
   const { openSheet } = useUi()
   const cloud = useCloud()
+  const inApp = Boolean(useApp())
   const [name, setName] = useState(state.settings.name || 'Gopichand')
   const [drops, setDrops] = useState(0)
   const nameId = useId()
@@ -156,17 +157,21 @@ export default function Welcome() {
           <p className="g-welcome__note">
             {cloud.linked
               ? `Your book syncs with ${cloud.email || 'your Google account'}, so it’s the same on every device you sign in on.`
-              : cloud.available
-                ? 'Everything stays in this browser (localStorage) until you turn on sync.'
-                : 'Everything stays in this browser (localStorage).'}{' '}
+              : inApp
+                ? 'Everything stays on this phone until you turn on sync.'
+                : cloud.available
+                  ? 'Everything stays in this browser (localStorage) until you turn on sync.'
+                  : 'Everything stays in this browser (localStorage).'}{' '}
             Nothing else is uploaded unless you ask the Munshi assistant a question. Sample data can be wiped from the
             banner later.
           </p>
         </form>
       </motion.div>
-      <button type="button" className="g-welcome__back" onClick={goPortfolio}>
-        <LuArrowLeft aria-hidden="true" /> Back to portfolio
-      </button>
+      {!inApp && (
+        <button type="button" className="g-welcome__back" onClick={goPortfolio}>
+          <LuArrowLeft aria-hidden="true" /> Back to portfolio
+        </button>
+      )}
     </main>
   )
 }

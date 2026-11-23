@@ -1,0 +1,84 @@
+# Run ONCE, by hand (Actions → Android signing key → Run workflow), before the first release.
+#
+# Creates the key every Gullak APK is signed with. Android only installs an update over the app when it is signed
+# with the same key, so this key is forever: it refuses to run once ANDROID_KEYSTORE_BASE64 exists.
+#
+# Before running: add the secret ANDROID_KEYSTORE_PASSWORD (a strong password, also kept in your password manager).
+# After running: follow the steps in the run's summary, then delete the run's artifact.
+name: Android signing key
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    name: Create the release key
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check the secrets
+        env:
+          EXISTING_KEY: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$EXISTING_KEY" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is already set. A new key would stop updates installing over the app, so nothing was created."
+            exit 1
+          fi
+          if [ "${#KEYSTORE_PASSWORD}" -lt 12 ]; then
+            echo "::error::Add the secret ANDROID_KEYSTORE_PASSWORD first (at least 12 characters), then run this again."
+            exit 1
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Create the key
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          mkdir -p key
+          keytool -genkeypair -noprompt -storetype PKCS12 -keystore key/gullak-release.jks -alias gullak \
+            -keyalg RSA -keysize 4096 -validity 36500 \
+            -storepass:env KEYSTORE_PASSWORD -keypass:env KEYSTORE_PASSWORD \
+            -dname "CN=Gullak, O=Gullak, C=IN"
+          base64 -w 0 key/gullak-release.jks > key/gullak-release.jks.base64.txt
+
+      - name: Show the fingerprints and next steps
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          PUBLIC_REPO: ${{ !github.event.repository.private }}
+        run: |
+          prints=$(keytool -list -v -keystore key/gullak-release.jks -alias gullak -storepass:env KEYSTORE_PASSWORD \
+            | grep -E '^\s*SHA(1|256):' | sed -E 's/^\s+//')
+          {
+            echo "## Gullak's release key is ready"
+            echo
+            echo "Fingerprints (not secret):"
+            echo
+            echo '```'
+            echo "$prints"
+            echo '```'
+            echo
+            echo "1. Download the **gullak-signing-key** artifact at the bottom of this page."
+            echo "2. Open \`gullak-release.jks.base64.txt\`, copy all of it, and save it as the repository secret **ANDROID_KEYSTORE_BASE64**."
+            echo "3. Back up \`gullak-release.jks\` and the password together somewhere safe that isn't the office laptop. Lose them and updates can't be installed."
+            echo "4. Firebase console → Project settings → Your apps → Android app \`com.scas3052.gullak\` → Add fingerprint: paste the SHA1 (and SHA256) above."
+            echo "5. Delete this run's artifact (or the whole run) once the secret is saved."
+            if [ "$PUBLIC_REPO" = "true" ]; then
+              echo
+              echo "> **This repository is public**, so the artifact can be downloaded by others until it's deleted. The key file is locked with your ANDROID_KEYSTORE_PASSWORD, but delete the artifact straight away."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gullak-signing-key
+          path: key/
+          retention-days: 1
+          if-no-files-found: error

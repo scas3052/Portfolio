@@ -38,10 +38,12 @@ npm run dev       # start the dev server at http://localhost:5173 (Gullak is at 
 npm run build     # production build into dist/
 npm run preview   # preview the production build locally
 npm run lint      # lint the source
-npm test          # run the unit tests (Munshi and cloud sync)
+npm test          # run the unit tests (Munshi, cloud sync and payment capture)
+npm run dev:app   # the Android app's screens in the browser, with sample payments (http://localhost:5174)
+npm run build:app # Gullak alone into dist-app/, for the Android app
 ```
 
-Munshi, Gullak's assistant, needs a passphrase and at least one free AI key in `.env.local`. Everything else works without them. See [Set it up locally](#set-it-up-locally). Cloud sync is optional too: it only appears once the `VITE_FIREBASE_*` variables are set. See [Cloud sync (Firebase)](#cloud-sync-firebase).
+Munshi, Gullak's assistant, needs a passphrase and at least one free AI key in `.env.local`. Everything else works without them. See [Set it up locally](#set-it-up-locally). Cloud sync is optional too: it only appears once the `VITE_FIREBASE_*` variables are set. See [Cloud sync (Firebase)](#cloud-sync-firebase). For the phone app, see [Gullak Android app](#gullak-android-app).
 
 ## Editing your content
 
@@ -281,17 +283,101 @@ In **Settings → Munshi → AI provider** you can pin one provider. It is tried
 
 ### Tests
 
-`npm test` runs the unit tests in [`tests/`](tests) with Node's built-in test runner (Node 22.15+). Munshi's (`tests/agent/`) cover quick add, name matching, building and saving drafts, undo, the chat loop and the relay client. The [cloud sync](#cloud-sync-firebase) tests (`tests/cloud/`, `tests/store/`) cover how the book is split into documents, merging, the offline queue, live updates, linking, signing out and the forgotten-PIN flow, against an in-memory stand-in for Firestore. Everything is mocked, so they need no keys, Firebase project or network.
+`npm test` runs the unit tests in [`tests/`](tests) with Node's built-in test runner (Node 22.15+). Munshi's (`tests/agent/`) cover quick add, name matching, building and saving drafts, undo, the chat loop and the relay client. The [cloud sync](#cloud-sync-firebase) tests (`tests/cloud/`, `tests/store/`) cover how the book is split into documents, merging, the offline queue, live updates, linking, signing out and the forgotten-PIN flow, against an in-memory stand-in for Firestore. The [Android app](#gullak-android-app) tests (`tests/inbox/`, `tests/agent/spends.test.mjs`, `tests/server/`) cover the SMS and notification parser, account matching, category suggestions, transfer pairing, Munshi's filing tools and `/api/app`. Everything is mocked, so they need no keys, Firebase project or network. The Java side of the parser has its own tests (`native/android/app/src/test/`), run by Gradle in GitHub Actions.
+
+## Gullak Android app
+
+Gullak (not the portfolio) also comes as an Android app. It's the same Gullak, with your book synced through the same Google sign-in, plus three things a website can't do:
+
+- **Payments are caught for you.** Bank SMS (as they arrive, plus a catch-up scan of the inbox) and Google Pay, PhonePe and Paytm notifications are kept as *unfiled spends*. Nothing goes into your book until you say what it was.
+- **It asks what each one was for.** Right after a payment, a notification asks "₹500 at Swiggy, what was it for?" and you can reply from the notification ("dinner, split with Ravi"). When you open Gullak, Home shows "3 unfiled spends · tap to file", and every card asks the same question. Your answer files the payment into the right category, and Gullak remembers the category for next time.
+- **Munshi does the filing.** Tell Munshi in plain words: "the 1,200 at Amazon was a gift for Amma", "split the Swiggy one with Ravi", "Uber is always Transport". It drafts the entries, splits, sets aside what isn't a spend and remembers rules. You confirm each draft.
+
+### How it's built
+
+- `npm run build:app` builds Gullak on its own into `dist-app/` (from `app/index.html` and `vite.app.config.js`). The website build (`npm run build`) is unchanged: app-only code lives in `src/finance/app/` and `src/finance/inbox/` and never loads on the website.
+- [Capacitor 8](https://capacitorjs.com) wraps `dist-app/` as an Android app. `android/` is generated, not committed: `npm run android:prepare` creates it from Capacitor's template and copies Gullak's native code from `native/android/` over it.
+- The native code (`native/android/app/src/main/java/com/scas3052/gullak/`) has the SMS receiver and inbox scan, the notification listener (Google Pay, PhonePe and Paytm only), "Share to Gullak", the "what was it for?" notification with Reply, and a small SQLite store of unfiled spends on the phone.
+- The SMS parser exists twice, `PaymentParser.java` on the phone and `src/finance/inbox/parse.js` for the tests and the browser preview. Both are tested against the same examples in `native/android/app/src/test/resources/payment-fixtures.txt`; add a new bank format there and both sides must handle it.
+- GitHub Actions builds, tests and signs the APK. `scripts/upload-apk.mjs` publishes it to Vercel Blob, and `/api/app` ([`api/app.js`](api/app.js)) tells the website and the app which build is newest.
+
+### One-time setup
+
+**Vercel**
+
+1. Storage → Create → **Blob**, with **Public** access (it can't be changed later), and connect it to this project.
+2. Add `https://localhost` to `AGENT_ALLOWED_ORIGINS` (comma-separated with any others), so the app can reach Munshi's relay. Redeploy.
+
+**GitHub** → Settings → Secrets and variables → Actions
+
+3. Secret `ANDROID_KEYSTORE_PASSWORD`: a strong password (12+ characters). Save it in your password manager too.
+4. Actions → **Android signing key** → Run workflow. Follow the run's summary: paste the artifact's `.txt` into the secret `ANDROID_KEYSTORE_BASE64`, back up the `.jks` file and the password somewhere other than the office laptop, then delete the artifact. Note the SHA-1 it shows.
+5. Secret `BLOB_READ_WRITE_TOKEN`: Vercel → Storage → your Blob store → the token shown under `.env.local`.
+6. Variables: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` (the same values as the website), `VITE_GOOGLE_WEB_CLIENT_ID` (step 8) and `GULLAK_SITE_URL` (your site, e.g. `https://your-site.vercel.app`).
+
+**Firebase console**
+
+7. Project settings → Your apps → Add app → **Android**, package name `com.scas3052.gullak`, then add the SHA-1 (and SHA-256) from step 4. You don't need its `google-services.json`.
+8. Authentication → Sign-in method → Google → Web SDK configuration → copy the **Web client ID** into the `VITE_GOOGLE_WEB_CLIENT_ID` variable.
+9. If your Firebase API key has website restrictions (Google Cloud console → Credentials), allow `localhost` too.
+10. Turn on cloud sync on the website, so your book is in the cloud before you first sign in on the app.
+
+**Then**
+
+11. Run `npm install` (it adds Capacitor to `package-lock.json`), commit and push. Actions → **Android app** → Run workflow publishes the first APK.
+
+The signing key and the app id (`com.scas3052.gullak`) are permanent. Android only installs an update that's signed with the same key, so if the key is lost, the app has to be uninstalled and installed again (with sync on, your book comes back).
+
+### Install it on your phone
+
+1. Open the Gullak site in Chrome on the phone → Settings → About → **Get the Android app** → Download.
+2. If Play Protect blocks it: Play Store → your profile → Play Protect → ⚙ → pause scanning for now.
+3. Open the downloaded file → allow Chrome to install apps → Install.
+4. Settings → Apps → Gullak → ⋮ → **Allow restricted settings**. Android needs this before an app installed from Chrome can read SMS or notifications.
+5. Open Gullak → sign in with Google → Settings → **Payment capture** → allow SMS, notification access and notifications, and pick how far back to look (none, 7 or 30 days).
+6. Turn Play Protect back on. For Gullak, turn off "Pause app activity if unused". On Xiaomi, Oppo or Vivo phones, also allow Autostart.
+
+**Updates:** once a day the app checks the site, and Home shows "Update available" when there's a newer build. Tapping it downloads the APK in Chrome, and it installs over the app with your data kept.
+
+### Permissions and privacy
+
+- **SMS:** only messages from bank sender ids (like `VM-HDFCBK`) are read; personal texts, OTPs, offers and reminders are skipped. The SMS text stays on the phone and is deleted once the payment is filed or set aside.
+- **Notification access:** only Google Pay, PhonePe and Paytm. Every other app's notifications are ignored.
+- **Munshi** sees the parsed details (amount, payee, the account's last digits, time) and your notes, never the SMS itself.
+- **Sync:** filed entries sync like any other entry. Unfiled spends and learned rules stay on the phone.
+- The APK holds no secrets: the Firebase web config is public by design, and Munshi's relay still needs your passphrase.
+
+### Troubleshooting
+
+- **"Restricted setting" when turning on SMS or notification access:** do step 4 of the install.
+- **Google sign-in says the app isn't registered:** Firebase doesn't have the signing key's SHA-1. Add the fingerprints from the signing-key run (the Android app run's summary shows them too).
+- **Munshi can't connect in the app:** `https://localhost` is missing from `AGENT_ALLOWED_ORIGINS`, or `GULLAK_SITE_URL` wasn't set when the APK was built.
+- **"The app isn't published from this site yet":** run the Android app workflow. Publishing needs the release key and `BLOB_READ_WRITE_TOKEN`.
+- **A payment didn't show up:** phones that close background apps can miss an SMS as it arrives; the catch-up scan finds it next time you open Gullak. For a bank format Gullak doesn't know yet, share the SMS to Gullak (Share → Gullak), and add an example to `payment-fixtures.txt`.
+- **Play Protect removed the app:** install it again from the site. With sync on, your book comes back.
+
+### Working on the app
+
+- `npm run dev:app` opens the app in the browser at http://localhost:5174 with sample captured payments, so the review screens work without a phone.
+- To build an APK yourself (needs Node 22+, JDK 21 and the Android SDK): `npm run build:app && npm run android:prepare`, then `cd android && ./gradlew testDebugUnitTest assembleDebug`.
+- The **Android app** workflow runs on every push that touches the app: lint, the Node tests, both builds, the Java parser tests and a signed APK (attached to the run). Running it by hand, or pushing a tag like `gullak-v1.2.0`, also publishes that APK to the site. The version code is the run number.
+- `/api/app` is a Vercel Function; Netlify deploys don't have it.
 
 ## Project structure
 
 ```
 public/                 favicon + résumé PDF
 finance/index.html      Gullak's page (served at /finance/)
-server/                 Munshi's relay (agentRelay.js), its provider list (providers.js) and the Vite dev/preview plugin
+app/                    Gullak's page for the Android app (npm run build:app → dist-app/)
+native/android/         the app's native code, icons and Java tests, copied over the generated android/ project
+capacitor.config.json   Capacitor settings for the app
+scripts/                android-prepare.mjs (creates android/), upload-apk.mjs (publishes an APK to Vercel Blob)
+.github/workflows/      android.yml (test, build, sign and publish the APK), android-signing-key.yml (run once)
+server/                 Munshi's relay (agentRelay.js), its provider list (providers.js), the Vite dev/preview plugin and appRelease.js (/api/app)
 api/agent.js            the relay as a Vercel Function
+api/app.js              the newest Android build, for the site's download button and the app's update check
 netlify/functions/      the relay as a Netlify Function (netlify.toml holds the build settings)
-tests/                  unit tests for Munshi and cloud sync (npm test)
+tests/                  unit tests for Munshi, cloud sync and the app's payment capture (npm test)
 .env.example            settings template for the relay and cloud sync (copy it to .env.local)
 firebase.json           Firebase CLI config for deploying the Firestore rules and indexes
 firestore.rules.example cloud sync security rules (copy to firestore.rules and add your email)
@@ -309,6 +395,8 @@ src/
   finance/              Gullak
     FinanceApp.jsx      app shell, page transitions and keyboard shortcuts
     main.jsx            Gullak's entry point
+    app/                the Android app's shell: entry point, native chrome, Google sign-in, sharing and update checks
+    inbox/              captured payments: parser, account and category matching, rules, the review sheet and Settings → Payment capture
     views/              the eight sections
     agent/              Munshi: chat loop, tools, prompt, quick add, drafts and saving, relay client
     cloud/              cloud sync: Firebase loader, document layout, merging, offline queue, sync engine and sign-in/out

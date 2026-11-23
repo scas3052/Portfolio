@@ -3,10 +3,10 @@ import { TONES } from '../lib/categories'
 import { monthOf } from '../lib/dates'
 import { runBlinds } from '../lib/effects'
 import { uid } from '../lib/id'
+import { LOCK_AFTER_MS } from '../lib/pin'
 import { THEME_COLORS, writeTheme } from '../lib/storage'
 import { UiContext, useFinance } from './contexts'
 
-const LOCK_AFTER_MS = 2 * 60 * 1000
 
 function makeParticles() {
   return Array.from({ length: 28 }, (_, i) => {
@@ -33,7 +33,7 @@ export default function UiProvider({ children }) {
   const [lockedState, setLocked] = useState(() => Boolean(state.settings.pinHash))
   const [pickedMonth, setPickedMonth] = useState(() => monthOf(today))
   const [theme, setTheme] = useState(() => (document.documentElement.dataset.finTheme === 'ink' ? 'ink' : 'paper'))
-  const [agent, setAgent] = useState({ open: false, closedAt: 0, prompt: null })
+  const [agent, setAgent] = useState({ open: false, closedAt: 0, prompt: null, focus: null })
   const hiddenAt = useRef(0)
 
   const pinHash = state.settings.pinHash
@@ -83,15 +83,28 @@ export default function UiProvider({ children }) {
     setAgent((current) => {
       const open = Boolean(typeof next === 'function' ? next(current.open) : next)
       if (open === current.open) return current
-      return open ? { ...current, open } : { open, closedAt: now, prompt: null }
+      return open ? { ...current, open } : { open, closedAt: now, prompt: null, focus: null }
     })
   }, [])
   const toggleAgent = useCallback(() => setAgentOpen((open) => !open), [setAgentOpen])
 
-  // Other surfaces (the command palette) can hand Munshi a question to send as soon as it opens.
-  const askAgent = useCallback((text) => {
+  // Other surfaces (the command palette, the app's noted payments) can hand Munshi a question to send as
+  // soon as it opens. `context` goes to the model with it; `chip` labels it in the chat.
+  const askAgent = useCallback((text, { context = '', chip = '' } = {}) => {
     const question = String(text || '').trim()
-    setAgent((current) => ({ ...current, open: true, prompt: question ? { id: uid('ask'), text: question } : null }))
+    setAgent((current) => ({
+      ...current,
+      open: true,
+      prompt: question ? { id: uid('ask'), text: question, context, chip } : null,
+    }))
+  }, [])
+
+  // Opens Munshi with something attached (a captured payment): the next message is about it.
+  const focusAgent = useCallback((focus) => {
+    setAgent((current) => ({ ...current, open: true, focus: focus || null }))
+  }, [])
+  const clearAgentFocus = useCallback(() => {
+    setAgent((current) => (current.focus ? { ...current, focus: null } : current))
   }, [])
   const takeAgentPrompt = useCallback((id) => {
     setAgent((current) => (current.prompt?.id === id ? { ...current, prompt: null } : current))
@@ -166,9 +179,12 @@ export default function UiProvider({ children }) {
       agentOpen: agent.open,
       agentClosedAt: agent.closedAt,
       agentPrompt: agent.prompt,
+      agentFocus: agent.focus,
       setAgentOpen,
       toggleAgent,
       askAgent,
+      focusAgent,
+      clearAgentFocus,
       takeAgentPrompt,
       locked,
       lock,
@@ -197,6 +213,8 @@ export default function UiProvider({ children }) {
       setAgentOpen,
       toggleAgent,
       askAgent,
+      focusAgent,
+      clearAgentFocus,
       takeAgentPrompt,
       locked,
       lock,

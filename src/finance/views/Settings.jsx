@@ -15,6 +15,7 @@ import {
   LuMoon,
   LuPalette,
   LuShieldCheck,
+  LuSmartphoneNfc,
   LuSun,
   LuTrash2,
   LuUndo2,
@@ -23,18 +24,20 @@ import {
 } from 'react-icons/lu'
 import { clearChat } from '../agent/agentConfig'
 import AssistantSettings from '../components/agent/AssistantSettings'
+import { AppVersion, GetAppButton } from '../components/GetApp'
 import { HoldButton, Segmented, ViewHeader } from '../components/bits'
 import SyncSettings from '../components/cloud/SyncSettings'
 import { useActions } from '../hooks/useActions'
 import { parseBackup } from '../lib/backup'
 import { cx } from '../lib/cx'
+import { onThisDevice } from '../lib/where'
 import { monthLabel } from '../lib/dates'
 import { spotlight } from '../lib/dom'
 import { plural } from '../lib/format'
-import { useCloud, useFinance, useUi } from '../store/contexts'
+import { useApp, useCloud, useFinance, useUi } from '../store/contexts'
 
 // Links like #/settings?focus=sync land on one group and light it up.
-const FOCUS_TARGETS = { assistant: 'g-settings-munshi', sync: 'g-settings-sync' }
+const FOCUS_TARGETS = { assistant: 'g-settings-munshi', sync: 'g-settings-sync', capture: 'g-settings-capture' }
 
 function Group({ icon: Icon, title, index, className, children, ...rest }) {
   return (
@@ -84,6 +87,9 @@ export default function Settings({ params }) {
   const ui = useUi()
   const cloud = useCloud()
   const { exportJSON, exportCSV, lockNow, goPortfolio } = useActions()
+  const app = useApp()
+  // In the Android app: Payment capture gets its own group, and there is no portfolio to go back to.
+  const Capture = app?.slots?.settings
   const fileInput = useRef(null)
   const hasPin = Boolean(state.settings.pinHash)
   const linked = cloud.linked
@@ -237,7 +243,7 @@ export default function Settings({ params }) {
             )}
           </div>
           <p className="g-settings__fine">
-            The PIN is a curtain, not a safe: it hides the screen but doesn’t encrypt what’s stored in this browser
+            The PIN is a curtain, not a safe: it hides the screen but doesn’t encrypt what’s stored {onThisDevice()}
             {linked && ' or in the cloud'}.
           </p>
         </Group>
@@ -246,7 +252,9 @@ export default function Settings({ params }) {
           <p className="g-settings__note">
             {linked
               ? 'Your book syncs to the cloud, but a backup file is still the copy nobody else holds. Download one every so often and keep it safe.'
-              : 'Everything lives only in this browser, on this device. Download a backup every so often and keep it safe.'}
+              : app
+                ? 'Everything lives only on this phone. Save a backup every so often and keep it somewhere else.'
+                : 'Everything lives only in this browser, on this device. Download a backup every so often and keep it safe.'}
           </p>
           <div className="g-settings__actions">
             <button type="button" className="g-btn g-btn--ink g-press" onClick={exportJSON}>
@@ -287,6 +295,12 @@ export default function Settings({ params }) {
           </Group>
         )}
 
+        {Capture && (
+          <Group id="g-settings-capture" icon={LuSmartphoneNfc} title="Payment capture" index={showSync ? 5 : 4} tabIndex={-1}>
+            <Capture />
+          </Group>
+        )}
+
         <Group
           id="g-settings-munshi"
           icon={LuFeather}
@@ -301,21 +315,32 @@ export default function Settings({ params }) {
         <Group icon={LuInfo} title="About" index={showSync ? 6 : 5}>
           <p className="g-settings__note">
             {linked
-              ? 'Gullak is a private money notebook with no tracking. Your entries live in this browser and sync to a cloud copy only your Google account can open.'
+              ? `Gullak is a private money notebook with no tracking. Your entries live ${onThisDevice()} and sync to a cloud copy only your Google account can open.`
               : showSync
-                ? 'Gullak is a private money notebook with no tracking. Sign-in is optional: until you turn on sync, your entries stay in this browser.'
-                : 'Gullak is a private money notebook: no sign-in, no tracking, and your entries stay in this browser.'}{' '}
-            Only what you ask Munshi goes anywhere else, through your own relay. Press <kbd className="g-kbd">?</kbd> for
-            shortcuts.
+                ? `Gullak is a private money notebook with no tracking. Sign-in is optional: until you turn on sync, your entries stay ${onThisDevice()}.`
+                : `Gullak is a private money notebook: no sign-in, no tracking, and your entries stay ${onThisDevice()}.`}{' '}
+            Only what you ask Munshi goes anywhere else, through your own relay.
+            {!app && (
+              <>
+                {' '}
+                Press <kbd className="g-kbd">?</kbd> for shortcuts.
+              </>
+            )}
           </p>
           <div className="g-settings__actions">
-            <button type="button" className="g-btn g-press" onClick={() => ui.openSheet('shortcuts')}>
-              <LuKeyboard aria-hidden="true" /> Shortcuts
-            </button>
-            <button type="button" className="g-btn g-btn--ghost g-press" onClick={goPortfolio}>
-              <LuUndo2 aria-hidden="true" /> Back to the portfolio
-            </button>
+            <GetAppButton />
+            {!app && (
+              <button type="button" className="g-btn g-press" onClick={() => ui.openSheet('shortcuts')}>
+                <LuKeyboard aria-hidden="true" /> Shortcuts
+              </button>
+            )}
+            {!app && (
+              <button type="button" className="g-btn g-btn--ghost g-press" onClick={goPortfolio}>
+                <LuUndo2 aria-hidden="true" /> Back to the portfolio
+              </button>
+            )}
           </div>
+          {app && <AppVersion />}
         </Group>
 
         <Group icon={LuTrash2} title="Danger zone" index={showSync ? 7 : 6} className="g-settings__group--danger">

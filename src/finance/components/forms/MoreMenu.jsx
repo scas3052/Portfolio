@@ -1,9 +1,9 @@
-import { LuEye, LuEyeOff, LuKeyboard, LuKeyRound, LuLock, LuMoon, LuSearch, LuSun, LuUndo2 } from 'react-icons/lu'
+import { LuEye, LuEyeOff, LuInbox, LuKeyboard, LuKeyRound, LuLock, LuMoon, LuSearch, LuSun, LuUndo2 } from 'react-icons/lu'
 import { useActions } from '../../hooks/useActions'
 import { TYPE_META } from '../../lib/categories'
 import { cx, toneVar } from '../../lib/cx'
 import { hrefFor, useHashRoute, VIEWS } from '../../lib/router'
-import { useFinance, useUi } from '../../store/contexts'
+import { useApp, useFinance, useUi } from '../../store/contexts'
 
 const QUICK = [
   { type: 'expense', label: 'Spend' },
@@ -20,6 +20,7 @@ export default function MoreMenu({ onDone }) {
   const ui = useUi()
   const { addEntry, lockNow, goPortfolio } = useActions()
   const { view } = useHashRoute()
+  const app = useApp()
   const ink = ui.theme === 'ink'
   const hasPin = Boolean(state.settings.pinHash)
 
@@ -52,7 +53,9 @@ export default function MoreMenu({ onDone }) {
     hasPin
       ? { id: 'lock', label: 'Lock now', icon: LuLock, run: lockNow }
       : { id: 'pin', label: 'Set a PIN', icon: LuKeyRound, run: () => ui.openSheet('pin') },
-    { id: 'keys', label: 'Shortcuts', icon: LuKeyboard, run: () => ui.openSheet('shortcuts') },
+    app
+      ? { id: 'inbox', label: 'Unfiled spends', icon: LuInbox, run: () => ui.openSheet('inbox') }
+      : { id: 'keys', label: 'Shortcuts', icon: LuKeyboard, run: () => ui.openSheet('shortcuts') },
   ]
 
   return (
@@ -125,17 +128,19 @@ export default function MoreMenu({ onDone }) {
         </div>
       </section>
 
-      <button
-        type="button"
-        className="g-more__back"
-        onClick={() => {
-          onDone()
-          goPortfolio()
-        }}
-      >
-        <LuUndo2 aria-hidden="true" />
-        Back to the portfolio
-      </button>
+      {!app && (
+        <button
+          type="button"
+          className="g-more__back"
+          onClick={() => {
+            onDone()
+            goPortfolio()
+          }}
+        >
+          <LuUndo2 aria-hidden="true" />
+          Back to the portfolio
+        </button>
+      )}
     </div>
   )
 }

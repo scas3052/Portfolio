@@ -186,14 +186,24 @@ function Gate() {
 /**
  * Gullak: a private money book kept in this browser, and optionally synced through the owner's
  * Google account so it follows them to other browsers and devices.
+ *
+ * `app` is only passed by the Android app's entry (src/finance/app/main.jsx): its Shell adds captured
+ * payments and native touches around the same screens, and nativeAuth signs in without popups.
  */
-export default function FinanceApp() {
+export default function FinanceApp({ app = null }) {
   const today = useToday()
+  const Shell = app?.Shell
   return (
     <FinanceProvider today={today}>
       <UiProvider>
-        <CloudProvider>
-          <Gate />
+        <CloudProvider nativeAuth={app?.nativeAuth || null}>
+          {Shell ? (
+            <Shell>
+              <Gate />
+            </Shell>
+          ) : (
+            <Gate />
+          )}
         </CloudProvider>
       </UiProvider>
     </FinanceProvider>

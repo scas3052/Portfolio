@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { FcGoogle } from 'react-icons/fc'
 import { LuKeyRound, LuLoaderCircle, LuMerge, LuRotateCw, LuShieldCheck, LuWifiOff } from 'react-icons/lu'
 import { linkingWords } from '../../cloud/describe'
+import { onThisDevice } from '../../lib/where'
 import { useCloud } from '../../store/contexts'
 
 const POINTS = [
@@ -58,7 +59,7 @@ export default function CloudSignInForm({ onDone }) {
   if (!cloud.available) {
     return (
       <div className="g-form g-sync-signin">
-        <p className="g-form__note">This copy of Gullak isn’t connected to a cloud, so your book stays in this browser.</p>
+        <p className="g-form__note">This copy of Gullak isn’t connected to a cloud, so your book stays {onThisDevice()}.</p>
         <div className="g-form__actions">
           <button type="button" className="g-btn g-btn--ghost g-press" onClick={onDone}>
             Close

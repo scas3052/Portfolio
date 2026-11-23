@@ -1,4 +1,6 @@
 // Plain words for the state of cloud sync, shared by the top bar badge and the Settings card.
+import { onThisDevice } from '../lib/where'
+
 const MINUTE = 60_000
 const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
@@ -41,7 +43,7 @@ export function describeSync(cloud, now = Date.now()) {
       'off',
       'gray',
       'Sync is off',
-      'This book lives only in this browser. Sign in with Google to keep it the same on all your devices.',
+      `This book lives only ${onThisDevice()}. Sign in with Google to keep it the same on all your devices.`,
       'signIn',
     )
   }

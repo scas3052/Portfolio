@@ -122,8 +122,53 @@ export const TOOLS = {
   },
 }
 
+// Only in the Android app, and only while captured payments wait to be filed.
+TOOLS.get_unfiled_spends = {
+  description: 'Captured bank/UPI payments waiting to be filed: ref (S1…), amount, in/out, payee, account, time, the user’s note and a suggestion.',
+  parameters: obj({}),
+}
+TOOLS.propose_file_spend = {
+  description:
+    'Draft filing a captured payment as entries the user confirms. A split is several entries adding up to the payment (e.g. expense 250 + lend 250 to Ravi). Account and date default to the payment’s. Or pass linkTo when it is already in the book.',
+  parameters: obj(
+    {
+      spend: str('Ref like S1, or the id'),
+      entries: { type: 'array', items: obj(ENTRY, ['type']) },
+      linkTo: str('Id of an existing entry that already records this payment'),
+    },
+    ['spend'],
+  ),
+}
+TOOLS.propose_dismiss_spend = {
+  description: 'Draft dropping a captured payment that isn’t a real spend (a duplicate, a test, already logged).',
+  parameters: obj({ spend: str('Ref like S1, or the id'), reason: str('Short reason') }, ['spend']),
+}
+TOOLS.propose_spend_rule = {
+  description: 'Draft a rule so a payee’s payments are always suggested the same way ("always file Swiggy as food").',
+  parameters: obj(
+    {
+      spend: str('Ref of a payment from that payee'),
+      payee: str('Payee name, when there is no payment to point at'),
+      type: { type: 'string', enum: ['expense', 'income'] },
+      category: str('Category id'),
+      note: str('Note to suggest'),
+    },
+    ['category'],
+  ),
+}
+
 export const READ_TOOLS = new Set(['get_accounts', 'get_people', 'get_loans', 'get_budgets', 'get_goals'])
-export const WRITE_TOOLS = new Set(['propose_entries', 'propose_update_entry', 'propose_delete_entry', 'propose_budget', 'propose_goal_contribution', 'propose_setup'])
+export const SPEND_READ_TOOLS = new Set(['get_unfiled_spends'])
+export const SPEND_WRITE_TOOLS = new Set(['propose_file_spend', 'propose_dismiss_spend', 'propose_spend_rule'])
+export const WRITE_TOOLS = new Set([
+  'propose_entries',
+  'propose_update_entry',
+  'propose_delete_entry',
+  'propose_budget',
+  'propose_goal_contribution',
+  'propose_setup',
+  ...SPEND_WRITE_TOOLS,
+])
 const CORE = ['get_overview', 'query_transactions', 'calculate']
 
 const WRITE_VERB =
@@ -160,8 +205,9 @@ const asTool = (name) => ({ type: 'function', function: { name, ...TOOLS[name] }
 /**
  * The tool list to send for a message: a smaller set when the intent is clear, to save tokens.
  * An answer to Munshi's own question (`followUp`) continues an earlier request, so it gets every tool.
+ * `spends` adds the captured-payment tools (Android app, with payments waiting).
  */
-export function toolsFor(text, { followUp = false } = {}) {
+export function toolsFor(text, { followUp = false, spends = false } = {}) {
   const intent = followUp ? 'any' : intentOf(text)
   let keep = () => true
   if (intent === 'read') keep = (name) => CORE.includes(name) || READ_TOOLS.has(name)
@@ -170,5 +216,9 @@ export function toolsFor(text, { followUp = false } = {}) {
     // get_people lets Munshi check who owes whom before drafting a collect or repay.
     keep = (name) => CORE.includes(name) || name === 'get_people' || (WRITE_TOOLS.has(name) && (setup || name !== 'propose_setup'))
   }
-  return Object.keys(TOOLS).filter(keep).map(asTool)
+  // Captured-payment tools only exist in the app, and only while payments wait to be filed.
+  const spendTool = (name) => SPEND_READ_TOOLS.has(name) || SPEND_WRITE_TOOLS.has(name)
+  const allowed = (name) =>
+    spendTool(name) ? spends && (intent !== 'read' || SPEND_READ_TOOLS.has(name)) : keep(name)
+  return Object.keys(TOOLS).filter(allowed).map(asTool)
 }

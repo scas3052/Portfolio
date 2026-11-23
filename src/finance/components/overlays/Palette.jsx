@@ -31,7 +31,7 @@ import { lockScroll, restoreFocus } from '../../lib/dom'
 import { formatINR, MASK } from '../../lib/format'
 import { navigate, VIEWS } from '../../lib/router'
 import { describeTxn, searchText } from '../../lib/selectors'
-import { useFinance, useUi } from '../../store/contexts'
+import { useApp, useFinance, useUi } from '../../store/contexts'
 
 function matches(item, words) {
   const hay = `${item.label} ${item.keywords || ''}`.toLowerCase()
@@ -43,6 +43,7 @@ export default function Palette({ onClose }) {
   const { state, derived, today } = useFinance()
   const ui = useUi()
   const actions = useActions()
+  const inApp = Boolean(useApp())
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const [opener] = useState(() => document.activeElement)
@@ -94,7 +95,7 @@ export default function Palette({ onClose }) {
     { id: 'backup', label: 'Download a backup (JSON)', keywords: 'export save backup', icon: LuFileDown, run: actions.exportJSON },
     { id: 'csv', label: 'Export entries as CSV', keywords: 'excel sheet export', icon: LuFileSpreadsheet, run: actions.exportCSV },
     { id: 'shortcuts', label: 'Keyboard shortcuts', keywords: 'keys help hotkeys', icon: LuKeyboard, keys: '?', run: () => ui.openSheet('shortcuts') },
-    { id: 'portfolio', label: 'Back to portfolio', keywords: 'portfolio home exit leave', icon: LuUndo2, run: actions.goPortfolio },
+    !inApp && { id: 'portfolio', label: 'Back to portfolio', keywords: 'portfolio home exit leave', icon: LuUndo2, run: actions.goPortfolio },
   ]
     .filter(Boolean)
     .map((item) => ({ ...item, section: 'Actions' }))

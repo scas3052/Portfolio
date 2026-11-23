@@ -1,0 +1,26 @@
+{
+  "appId": "com.scas3052.gullak",
+  "appName": "Gullak",
+  "webDir": "dist-app",
+  "backgroundColor": "#f2eee3",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    },
+    "Keyboard": {
+      "resizeOnFullScreen": true
+    },
+    "SocialLogin": {
+      "providers": {
+        "google": true,
+        "facebook": false,
+        "apple": false,
+        "twitter": false
+      }
+    }
+  }
+}

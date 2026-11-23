@@ -3,13 +3,14 @@ import { useActions } from '../../hooks/useActions'
 import { cx, toneVar } from '../../lib/cx'
 import { plural } from '../../lib/format'
 import { hrefFor, VIEWS } from '../../lib/router'
-import { useFinance } from '../../store/contexts'
+import { useApp, useFinance } from '../../store/contexts'
 import Brand from './Brand'
 
 /** Desktop navigation: a strip of index tabs with a highlighter swipe on the active one. */
 export default function Sidebar({ view }) {
   const { state } = useFinance()
   const { addEntry, goPortfolio } = useActions()
+  const inApp = Boolean(useApp())
   const count = state.transactions.length
 
   return (
@@ -59,10 +60,12 @@ export default function Sidebar({ view }) {
           <span key={count} className="g-side__led" aria-hidden="true" />
           Saved on this device · {plural(count, 'entry', 'entries')}
         </p>
-        <button type="button" className="g-side__back" onClick={goPortfolio}>
-          <LuUndo2 aria-hidden="true" />
-          Back to portfolio
-        </button>
+        {!inApp && (
+          <button type="button" className="g-side__back" onClick={goPortfolio}>
+            <LuUndo2 aria-hidden="true" />
+            Back to portfolio
+          </button>
+        )}
       </div>
     </aside>
   )

@@ -15,6 +15,12 @@ const MESSAGES = {
   'auth/network-request-failed': OFFLINE,
   'auth/user-mismatch': 'That’s a different Google account. Pick the one this device syncs with.',
   'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.',
+  // Android app sign-in (Google account picker, see app/nativeAuth.js).
+  'auth/app-not-configured':
+    'Google sign-in isn’t set up in this build of the app. Add VITE_GOOGLE_WEB_CLIENT_ID to the build settings and install a new build.',
+  'auth/app-not-registered':
+    'Google doesn’t recognise this copy of the app yet. Add its SHA-1 in Firebase (Project settings → Your apps → Android app), then try again.',
+  'auth/no-google-account': 'Add a Google account to this phone (Settings → Passwords & accounts), then try again.',
   'auth/web-storage-unsupported':
     'This browser blocks the storage Google sign-in needs. Allow site data (or leave private browsing) and try again.',
   'permission-denied': OWNER_ONLY,

@@ -1,13 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { LuCircleStop, LuMic, LuSendHorizontal } from 'react-icons/lu'
 import { cx } from '../../lib/cx'
+import { useApp } from '../../store/contexts'
 
 const MAX = 2000
 const MAX_HEIGHT = 136
 const Recognition = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null
 
 /** The pen: an autosizing note field with voice input. Enter sends, Shift+Enter starts a new line. */
-export default function Composer({ busy, onSend, onStop, voiceLang = 'en-IN', onField, onNotice, seed }) {
+export default function Composer({ busy, onSend, onStop, voiceLang = 'en-IN', onField, onNotice, seed, placeholder }) {
+  // The app's web view has no speech service behind SpeechRecognition, so the mic only shows in browsers.
+  const native = Boolean(useApp()?.native)
+  const canListen = Boolean(Recognition) && !native
   const [value, setValue] = useState('')
   const [seenSeed, setSeenSeed] = useState(seed)
   const [listening, setListening] = useState(false)
@@ -48,7 +52,7 @@ export default function Composer({ busy, onSend, onStop, voiceLang = 'en-IN', on
   }
 
   const toggleMic = () => {
-    if (!Recognition) return
+    if (!canListen) return
     if (recognition.current) {
       recognition.current.stop()
       return
@@ -101,7 +105,7 @@ export default function Composer({ busy, onSend, onStop, voiceLang = 'en-IN', on
         rows={1}
         value={value}
         maxLength={MAX}
-        placeholder={listening ? 'Listening…' : 'Ask, or note: “spent 240 on lunch”'}
+        placeholder={listening ? 'Listening…' : placeholder || 'Ask, or note: “spent 240 on lunch”'}
         enterKeyHint="send"
         autoComplete="off"
         onChange={(event) => setValue(event.target.value)}
@@ -117,7 +121,7 @@ export default function Composer({ busy, onSend, onStop, voiceLang = 'en-IN', on
           {value.length}/{MAX}
         </span>
       )}
-      {Recognition && (
+      {canListen && (
         <button
           type="button"
           className={cx('g-icon-btn g-press g-mk-mic', listening && 'is-on')}

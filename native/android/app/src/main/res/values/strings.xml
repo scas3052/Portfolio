@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Gullak</string>
+    <string name="title_activity_main">Gullak</string>
+    <string name="package_name">com.scas3052.gullak</string>
+    <string name="custom_url_scheme">com.scas3052.gullak</string>
+    <string name="share_label">Add to Gullak</string>
+    <string name="listener_label">Gullak payment capture</string>
+    <string name="channel_payments">Payments to file</string>
+    <string name="channel_payments_desc">One note for each payment Gullak catches, so you can say what it was for.</string>
+</resources>

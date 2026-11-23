@@ -3,6 +3,9 @@
 
 export const PIN_LENGTH = 4
 
+/** Gullak locks again after this long in the background. */
+export const LOCK_AFTER_MS = 2 * 60 * 1000
+
 export function hashPin(pin) {
   const input = `gullak::${pin}::piggy-bank`
   let hash = 0x811c9dc5

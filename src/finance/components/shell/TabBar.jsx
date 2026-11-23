@@ -2,11 +2,11 @@ import { LuEllipsis, LuPlus } from 'react-icons/lu'
 import { useActions } from '../../hooks/useActions'
 import { cx, toneVar } from '../../lib/cx'
 import { hrefFor, viewMeta } from '../../lib/router'
-import { useUi } from '../../store/contexts'
+import { useApp, useUi } from '../../store/contexts'
 
 const TABS = ['overview', 'activity', 'accounts']
 
-function Tab({ id, active }) {
+function Tab({ id, active, badge = 0 }) {
   const meta = viewMeta(id)
   const Icon = meta.icon
   return (
@@ -18,8 +18,12 @@ function Tab({ id, active }) {
     >
       <span className="g-tab__icon">
         <Icon aria-hidden="true" />
+        {badge > 0 && <span className="g-tab__badge">{badge > 9 ? '9+' : badge}</span>}
       </span>
-      <span className="g-tab__label">{meta.short}</span>
+      <span className="g-tab__label">
+        {meta.short}
+        {badge > 0 && <span className="sr-only">, {badge} unfiled</span>}
+      </span>
     </a>
   )
 }
@@ -28,13 +32,15 @@ function Tab({ id, active }) {
 export default function TabBar({ view }) {
   const { addEntry } = useActions()
   const { openSheet } = useUi()
+  // In the app, Home carries the number of payments waiting to be filed.
+  const unfiled = useApp()?.inbox?.unfiled.length || 0
   const inTabs = TABS.includes(view)
   const current = viewMeta(view)
   const MoreIcon = inTabs ? LuEllipsis : current.icon
 
   return (
     <nav className="g-tabs" aria-label="Sections">
-      <Tab id="overview" active={view === 'overview'} />
+      <Tab id="overview" active={view === 'overview'} badge={unfiled} />
       <Tab id="activity" active={view === 'activity'} />
       <button
         type="button"

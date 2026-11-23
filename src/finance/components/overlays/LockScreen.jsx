@@ -4,6 +4,7 @@ import { LuDelete, LuKeyRound, LuX } from 'react-icons/lu'
 import { useKeydown } from '../../hooks/useKeydown'
 import { cx } from '../../lib/cx'
 import { checkPin, PIN_LENGTH } from '../../lib/pin'
+import { thisDevice } from '../../lib/where'
 import { useCloud, useFinance, useUi } from '../../store/contexts'
 import { HoldButton } from '../bits'
 import CloudForgot from '../cloud/CloudForgot'
@@ -115,7 +116,7 @@ export default function LockScreen() {
         ) : forgot ? (
           <div className="g-lock__forgot">
             <p>
-              The PIN only hides Gullak on this browser, so it can’t be recovered. To start over, hold the button: it
+              The PIN only hides Gullak on {thisDevice()}, so it can’t be recovered. To start over, hold the button: it
               erases everything saved here. You can import a backup afterwards.
             </p>
             <HoldButton tone="coral" duration={1600} onConfirm={() => dispatch({ type: 'data/clear' })}>

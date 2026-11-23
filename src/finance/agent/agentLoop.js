@@ -4,6 +4,7 @@ import { AgentError, chat } from './client'
 import { executeTool, fitResult } from './executors'
 import { parseJSON } from './parse'
 import { buildSystemPrompt } from './prompt'
+import { unfiledSpends } from './spends'
 import { toolsFor, WRITE_TOOLS } from './tools'
 
 export const MAX_STEPS = 5
@@ -32,6 +33,10 @@ const STEP_LABELS = {
   propose_budget: 'Drafting a budget',
   propose_goal_contribution: 'Drafting a contribution',
   propose_setup: 'Drafting a new item',
+  get_unfiled_spends: 'Checking captured payments',
+  propose_file_spend: 'Filing a payment',
+  propose_dismiss_spend: 'Setting a payment aside',
+  propose_spend_rule: 'Drafting a rule',
 }
 
 export const stepLabel = (name) => STEP_LABELS[name] || 'Working'
@@ -87,7 +92,8 @@ function factsMemo(facts, max) {
 /** One stored message as history text; an assistant reply keeps its memo lines whole and clips its words to make room. */
 function turnText(m) {
   const text = typeof m.text === 'string' ? m.text.trim() : ''
-  if (m.role !== 'assistant') return clip(text, HISTORY_CHARS)
+  // A user turn keeps what was attached to it (a captured payment), so follow-ups still know which one.
+  if (m.role !== 'assistant') return clip(typeof m.context === 'string' && m.context ? `${text}\n${m.context}` : text, HISTORY_CHARS)
   const cards = draftMemo(m.drafts)
   const found = factsMemo(m.facts, Math.min(FACTS_CHARS, MEMO_CHARS - (cards ? cards.length + 1 : 0)))
   const memo = [cards, found].filter(Boolean).join('\n')
@@ -154,9 +160,10 @@ function argumentsJSON(raw) {
  */
 export async function runAgent({ text, history = [], getCtx, signal, onDelta, onStep }) {
   const start = getCtx()
-  const tools = toolsFor(text, { followUp: askedLast(history) })
+  const waiting = unfiledSpends(start.inbox).length
+  const tools = toolsFor(text, { followUp: askedLast(history), spends: waiting > 0 })
   const messages = [
-    { role: 'system', content: buildSystemPrompt(start.state, start.derived, start.today) },
+    { role: 'system', content: buildSystemPrompt(start.state, start.derived, start.today, { unfiled: waiting }) },
     ...history,
     { role: 'user', content: text },
   ]

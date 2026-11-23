@@ -288,6 +288,77 @@ function commitSetup(ctx, kind, prefill, quiet) {
   return { ok: true, undo }
 }
 
+// ---- captured payments (Android app) ------------------------------------------------------------
+// ctx.inbox: {find(id), markFiled(id, entryIds), restore(id), dismiss(id), learn(key, rule) → previous rule,
+// setRule(key, rule | null)}. The native calls run in the background; the book changes here, synchronously.
+
+const noInbox = () => failed('Captured payments are only in the Gullak app.')
+
+function openSpend(ctx, id) {
+  const spend = ctx.inbox?.find(id)
+  if (!spend) return { error: 'That payment is no longer waiting.' }
+  if (spend.status !== 'unfiled') return { error: 'That payment is already filed.' }
+  return { spend }
+}
+
+const filedWords = (ctx, data) => `${ctx.ui.privacy ? 'Filed' : `Filed ${formatINR(data.amount)}`} · ${data.title}`
+
+function commitSpendFile(ctx, data, { quiet, peopleCache }) {
+  if (!ctx.inbox) return noInbox()
+  const { spend, error } = openSpend(ctx, data.spendId)
+  if (error) return failed(error)
+  const entries = Array.isArray(data.entries) ? data.entries : []
+  if (!entries.length) return failed('Nothing to file.')
+  for (const entry of entries) {
+    const problem = firstError(validateEntry(entry, ctx.state))
+    if (problem) return failed(problem)
+  }
+  const cache = peopleCache || new Map()
+  const saved = entries.map((entry) => commitEntry(ctx, entry, { peopleCache: cache, quiet: true }))
+  ctx.inbox.markFiled(spend.id, saved.map((r) => r.record.id))
+  const learned = data.rule?.key ? { previous: ctx.inbox.learn(data.rule.key, data.rule) } : null
+  const undo = () => {
+    ;[...saved].reverse().forEach((r) => r.undo())
+    ctx.inbox.restore(spend.id)
+    if (learned) ctx.inbox.setRule(data.rule.key, learned.previous || null)
+  }
+  if (!quiet) ctx.ui.toast(filedWords(ctx, data), { tone: 'lime', action: { label: 'Undo', run: undo } })
+  return { ok: true, undo, record: saved[0].record }
+}
+
+function commitSpendLink(ctx, data, quiet) {
+  if (!ctx.inbox) return noInbox()
+  const { spend, error } = openSpend(ctx, data.spendId)
+  if (error) return failed(error)
+  if (!ctx.state.transactions.some((t) => t.id === data.entryId)) return failed('That entry no longer exists.')
+  ctx.inbox.markFiled(spend.id, [data.entryId])
+  const undo = () => ctx.inbox.restore(spend.id)
+  if (!quiet) ctx.ui.toast(`Already in the book · ${data.title}`, { tone: 'sky', action: { label: 'Undo', run: undo } })
+  return { ok: true, undo }
+}
+
+function commitSpendDismiss(ctx, data, quiet) {
+  if (!ctx.inbox) return noInbox()
+  const { spend, error } = openSpend(ctx, data.spendId)
+  if (error) return failed(error)
+  ctx.inbox.dismiss(spend.id)
+  const undo = () => ctx.inbox.restore(spend.id)
+  if (!quiet) ctx.ui.toast(`Set aside · ${data.title}`, { tone: 'gray', action: { label: 'Undo', run: undo } })
+  return { ok: true, undo }
+}
+
+function commitSpendRule(ctx, data, quiet) {
+  if (!ctx.inbox) return noInbox()
+  if (!data.key || !data.rule?.type) return failed('That rule is incomplete.')
+  const previous = ctx.inbox.learn(data.key, data.rule)
+  const undo = () => ctx.inbox.setRule(data.key, previous || null)
+  if (!quiet) {
+    const label = data.rule.category ? categoryMeta(data.rule.category).short : TYPE_META[data.rule.type]?.label
+    ctx.ui.toast(`Got it: ${data.label} → ${label}`, { tone: 'lilac', action: { label: 'Undo', run: undo } })
+  }
+  return { ok: true, undo }
+}
+
 /**
  * Applies one confirmed draft card. ctx = {state, dispatch, derived, ui, today}, read fresh at
  * confirm time so stale drafts fail politely instead of writing over newer data.
@@ -315,6 +386,14 @@ export function commitDraft(ctx, draft, { peopleCache = null, quiet = false } = 
       return commitContribution(ctx, data, quiet)
     case 'setup':
       return commitSetup(ctx, data.setup, data.prefill, quiet)
+    case 'spend':
+      return commitSpendFile(ctx, data, { quiet, peopleCache })
+    case 'spendLink':
+      return commitSpendLink(ctx, data, quiet)
+    case 'spendDismiss':
+      return commitSpendDismiss(ctx, data, quiet)
+    case 'spendRule':
+      return commitSpendRule(ctx, data, quiet)
     default:
       return failed('Unknown draft.')
   }

@@ -1,7 +1,10 @@
 import { AnimatePresence, motion } from 'motion/react'
 import {
+  LuBan,
   LuCheck,
+  LuInbox,
   LuLandmark,
+  LuLink,
   LuPencil,
   LuPencilLine,
   LuPiggyBank,
@@ -10,13 +13,23 @@ import {
   LuTrash2,
   LuTriangleAlert,
   LuWallet,
+  LuWandSparkles,
   LuX,
 } from 'react-icons/lu'
 import { TYPE_META } from '../../lib/categories'
 import { cx, toneVar } from '../../lib/cx'
 import { formatINR, MASK } from '../../lib/format'
 
-const KIND_ICON = { update: LuPencilLine, delete: LuTrash2, budget: LuTarget, contribution: LuPiggyBank }
+const KIND_ICON = {
+  update: LuPencilLine,
+  delete: LuTrash2,
+  budget: LuTarget,
+  contribution: LuPiggyBank,
+  spend: LuInbox,
+  spendLink: LuLink,
+  spendDismiss: LuBan,
+  spendRule: LuWandSparkles,
+}
 const SETUP_ICON = { account: LuWallet, loan: LuLandmark, goal: LuPiggyBank }
 const RUPEES = /[-−+]?₹\s?[\d,]+(?:\.\d+)?/g
 
@@ -30,12 +43,17 @@ function Glyph({ icon: Icon }) {
   return <Icon aria-hidden="true" />
 }
 
-function confirmLabel(draft) {
-  if (draft.kind === 'delete') return 'Delete'
-  if (draft.kind === 'setup') return 'Create'
-  if (draft.kind === 'update') return 'Save change'
-  return 'Confirm'
+const CONFIRM_LABELS = {
+  delete: 'Delete',
+  setup: 'Create',
+  update: 'Save change',
+  spend: 'File it',
+  spendLink: 'Same one',
+  spendDismiss: 'Set aside',
+  spendRule: 'Remember',
 }
+
+const confirmLabel = (draft) => CONFIRM_LABELS[draft.kind] || 'Confirm'
 
 const tear = {
   initial: { opacity: 0, y: 14, rotateX: -24 },

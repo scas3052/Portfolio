@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en" data-fin-theme="paper" data-gullak-app="">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <title>Gullak</title>
+    <meta name="theme-color" content="#f2eee3" />
+    <style>
+      html { background: #f2eee3; }
+      html[data-fin-theme='ink'] { background: #121212; }
+    </style>
+    <script>
+      ;(function () {
+        try {
+          if (localStorage.getItem('gullak:theme') === 'ink') {
+            document.documentElement.setAttribute('data-fin-theme', 'ink')
+            document.querySelector('meta[name="theme-color"]').setAttribute('content', '#121212')
+          }
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="gullak-root"></div>
+    <script type="module" src="./main.jsx"></script>
+  </body>
+</html>
