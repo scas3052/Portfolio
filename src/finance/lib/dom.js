@@ -62,6 +62,18 @@ export function trapTab(event, container) {
   }
 }
 
+/** Scrolls the element with `id` into view, replays its highlight and moves focus to it. */
+export function spotlight(id) {
+  const target = document.getElementById(id)
+  if (!target) return
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' })
+  target.classList.remove('is-spotlit')
+  void target.offsetWidth
+  target.classList.add('is-spotlit')
+  target.focus({ preventScroll: true })
+}
+
 /** Returns focus to `element`, unless something outside `container` has already taken it. */
 export function restoreFocus(element, container) {
   const current = document.activeElement

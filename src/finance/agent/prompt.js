@@ -19,8 +19,14 @@ function peopleLine(derived) {
   return joined(names) + (more > 0 ? ` (+${more} more)` : '')
 }
 
+function spendLines(unfiled) {
+  if (!unfiled) return ''
+  return `
+Captured payments: ${unfiled} from bank SMS and UPI apps wait to be filed. Read them with get_unfiled_spends (refs S1, S2…). File one with propose_file_spend: one entry, or a split as several entries that add up to the payment (spent 250 + lent 250 to Ravi). If it is already in the book, pass linkTo instead. Use propose_dismiss_spend for duplicates and non-spends, and propose_spend_rule when the user says how a payee should always be filed. The user's note on a payment says what it was for.`
+}
+
 /** The system prompt: rules plus the names Munshi may refer to. Ids and amounts stay behind tools. */
-export function buildSystemPrompt(state, derived, today) {
+export function buildSystemPrompt(state, derived, today, { unfiled = 0 } = {}) {
   const owner = state.settings?.name?.trim()
   const accounts = state.accounts.map((a) => `${a.name} (${accountKindLabel(a.kind).toLowerCase()})`)
   const loans = derived.loans.map(({ loan, done }) => `${loan.name} (${done ? 'paid off' : `EMI ${formatINR(loan.emi)}`})`)
@@ -47,5 +53,5 @@ Accounts: ${joined(accounts)}
 People: ${peopleLine(derived)}
 Loans: ${joined(loans)}
 Goals: ${joined(goals)}
-Budgets on: ${joined(budgets)}`
+Budgets on: ${joined(budgets)}${spendLines(unfiled)}`
 }

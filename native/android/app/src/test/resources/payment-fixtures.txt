@@ -1,0 +1,435 @@
+# Payment message fixtures, shared by the native parser tests (PaymentParserTest.java) and the
+# JavaScript twin (tests/inbox/parse.test.mjs). When a bank or app changes its wording, add the new
+# message here first, then teach both parsers.
+#
+# == <name>            starts a case
+# kind: sms|app|share   which parser runs
+# from: <sender>        SMS sender id (sms), or gpay|phonepe|paytm (app)
+# title: <text>         notification title (app only)
+# text: <text>          message body; \n stands for a line break
+# expect: none          the message must be skipped
+# amount, dir, account, party, vpa, ref, channel, balance
+#                       expected fields; "-" means the field must be empty. Fields left out aren't checked.
+
+== hdfc upi sent, multi-line
+kind: sms
+from: VM-HDFCBK-S
+text: Sent Rs.500.00\nFrom HDFC Bank A/C *1234\nTo SWIGGY\nOn 21/11/26\nRef 432112345678\nNot You?\nCall 18002586161/SMS BLOCK UPI to 7308080808
+amount: 500.00
+dir: out
+account: 1234
+party: SWIGGY
+vpa: -
+ref: 432112345678
+channel: upi
+balance: -
+
+== hdfc debit to vpa
+kind: sms
+from: AD-HDFCBK
+text: Rs 250.00 debited from a/c **1234 on 21-11-26 to VPA zomato@hdfcbank(UPI Ref No 432112345601). Not you? Call on 18002586161 to report
+amount: 250.00
+dir: out
+account: 1234
+party: -
+vpa: zomato@hdfcbank
+ref: 432112345601
+channel: upi
+
+== hdfc debit card spend
+kind: sms
+from: VM-HDFCBK
+text: Spent Rs.1,250.00 On HDFC Bank Card 1234 At AMAZON On 2026-11-21:20:31:45 Bal Rs.85,432.10 Not You? Call 18002586161/SMS BLOCK DC 1234 to 7308080808
+amount: 1250.00
+dir: out
+account: 1234
+party: AMAZON
+channel: card
+balance: 85432.10
+
+== hdfc credit card spend
+kind: sms
+from: JD-HDFCBK-S
+text: Rs.2,999.00 spent on HDFC Bank Credit Card XX5678 at MYNTRA on 2026-11-20 13:05:12. Avl Lmt: Rs.85,432.10. Not you? Call 18002586161
+amount: 2999.00
+dir: out
+account: 5678
+party: MYNTRA
+channel: card
+balance: -
+
+== hdfc salary by neft
+kind: sms
+from: VM-HDFCBK-S
+text: Update! INR 72,000.00 deposited in HDFC Bank A/c XX1234 on 01-NOV-26 for NEFT Cr-ICIC0000001-ACME CORP PVT LTD-ACME SALARY NOV.Avl bal INR 1,23,456.78. Cheque deposits in A/C are subject to clearing
+amount: 72000.00
+dir: in
+account: 1234
+party: ACME CORP PVT LTD-ACME SALARY NOV
+channel: netbanking
+balance: 123456.78
+
+== hdfc upi credit from vpa
+kind: sms
+from: VM-HDFCBK
+text: Rs.500.00 credited to HDFC Bank A/c XX1234 on 21-11-26 by VPA ravi.k@okaxis (UPI Ref No 432112345602).
+amount: 500.00
+dir: in
+account: 1234
+party: -
+vpa: ravi.k@okaxis
+ref: 432112345602
+channel: upi
+
+== hdfc otp is skipped
+kind: sms
+from: VM-HDFCBK-S
+text: 123456 is OTP for txn of INR 1250.00 at AMAZON on HDFC Bank card ending 1234. Valid till 20:36. Do not share OTP for security reasons
+expect: none
+
+== hdfc card statement is skipped
+kind: sms
+from: VM-HDFCBK-S
+text: Your HDFC Bank Credit Card XX1234 statement is generated. Total Amt Due: Rs.15,430.00, Min Amt Due: Rs.780.00, Due Date: 05-12-26
+expect: none
+
+== will-be-debited reminder is skipped
+kind: sms
+from: VM-HDFCBK-S
+text: Rs.199.00 will be debited from your HDFC Bank A/c XX1234 on 25-11-26 towards NETFLIX for UPI-Mandate. Ensure sufficient balance
+expect: none
+
+== sbi upi debit without currency
+kind: sms
+from: JD-SBIUPI-S
+text: Dear UPI user A/C X1234 debited by 500.0 on date 21Nov26 trf to SWIGGY Refno 432112345603. If not u? call 1800111109. -SBI
+amount: 500.00
+dir: out
+account: 1234
+party: SWIGGY
+ref: 432112345603
+channel: upi
+
+== sbi credit by transfer
+kind: sms
+from: VM-SBIINB
+text: Dear SBI User, your A/c X1234-credited by Rs.500 on 21Nov26 transfer from RAVI KUMAR Ref No 432112345604 -SBI
+amount: 500.00
+dir: in
+account: 1234
+party: RAVI KUMAR
+ref: 432112345604
+channel: -
+
+== sbi atm withdrawal
+kind: sms
+from: AD-SBIINB
+text: Dear Customer, Rs.2,000 withdrawn at ATM S1ANBG12 from A/c X1234 on 21Nov26. Avl bal Rs 12,345.67. If not done by you, call 1800111109 -SBI
+amount: 2000.00
+dir: out
+account: 1234
+party: ATM
+channel: atm
+balance: 12345.67
+
+== sbi credit card spend
+kind: sms
+from: VM-SBICRD
+text: Rs.499.00 spent on your SBI Credit Card ending 1234 at SPOTIFY on 21/11/26. Trxn. not done by you? Report at https://sbicard.com/Dispute
+amount: 499.00
+dir: out
+account: 1234
+party: SPOTIFY
+channel: card
+
+== icici upi debit, payee before credited
+kind: sms
+from: VK-ICICIT-S
+text: ICICI Bank Acct XX234 debited for Rs 500.00 on 21-Nov-26; SWIGGY credited. UPI:432112345605. Call 18002662 for dispute. SMS BLOCK 234 to 9215676766.
+amount: 500.00
+dir: out
+account: 234
+party: SWIGGY
+ref: 432112345605
+channel: upi
+
+== icici card spend, merchant after the date
+kind: sms
+from: VM-ICICIT
+text: INR 1,250.00 spent using ICICI Bank Card XX7712 on 21-Nov-26 on AMAZON. Avl Limit: INR 85,432.10. If not you, call 1800 2662/SMS BLOCK 7712 to 9215676766
+amount: 1250.00
+dir: out
+account: 7712
+party: AMAZON
+channel: card
+balance: -
+
+== icici upi credit
+kind: sms
+from: VM-ICICIB
+text: Dear Customer, Acct XX234 is credited with Rs 500.00 on 21-Nov-26 from RAVI KUMAR. UPI:432112345606-ICICI Bank.
+amount: 500.00
+dir: in
+account: 234
+party: RAVI KUMAR
+ref: 432112345606
+channel: upi
+
+== axis upi debit, multi-line
+kind: sms
+from: AX-AXISBK-S
+text: INR 500.00 debited\nA/c no. XX1234\n21-11-26, 20:31:45\nUPI/P2M/432112345607/SWIGGY\nNot you? SMS BLOCKUPI Cust ID to 919951860002\nAxis Bank
+amount: 500.00
+dir: out
+account: 1234
+party: SWIGGY
+ref: 432112345607
+channel: upi
+
+== axis upi credit
+kind: sms
+from: AX-AXISBK
+text: INR 500.00 credited\nA/c no. XX1234\n21-11-26, 20:31:45 IST\nUPI/P2A/432112345608/RAVI KUMAR\nAxis Bank
+amount: 500.00
+dir: in
+account: 1234
+party: RAVI KUMAR
+ref: 432112345608
+channel: upi
+
+== kotak sent to vpa
+kind: sms
+from: VM-KOTAKB-S
+text: Sent Rs.500.00 from Kotak Bank AC X1234 to swiggy@icici on 21-11-26.UPI Ref 432112345609. Not you, https://kotak.com/KBANKT/Fraud
+amount: 500.00
+dir: out
+account: 1234
+party: -
+vpa: swiggy@icici
+ref: 432112345609
+channel: upi
+
+== kotak received from vpa
+kind: sms
+from: VM-KOTAKB
+text: Received Rs.500.00 in your Kotak Bank AC X1234 from ravi.k@okaxis on 21-11-26.UPI Ref:432112345610.
+amount: 500.00
+dir: in
+account: 1234
+party: -
+vpa: ravi.k@okaxis
+ref: 432112345610
+channel: upi
+
+== bank of baroda debit with balance
+kind: sms
+from: BP-BOBTXN
+text: Rs.150.00 debited from A/c XX1234 on 21-11-2026 to VPA chai.stall@ybl, UPI Ref 432112345611. Avl Bal Rs.5,678.90 -BOB
+amount: 150.00
+dir: out
+account: 1234
+vpa: chai.stall@ybl
+ref: 432112345611
+channel: upi
+balance: 5678.90
+
+== refund is money in
+kind: sms
+from: VM-HDFCBK
+text: Refund of Rs.250.00 from AMAZON has been credited to your HDFC Bank A/c XX1234 on 21-11-26.
+amount: 250.00
+dir: in
+account: 1234
+party: AMAZON
+
+== card bill payment received
+kind: sms
+from: VM-HDFCBK
+text: Payment of Rs.15,430.00 received on your HDFC Bank Credit Card XX1234 on 03-12-26. Thank you
+amount: 15430.00
+dir: in
+account: 1234
+party: -
+channel: card
+
+== promotional sender is skipped
+kind: sms
+from: AD-HDFCBK-P
+text: Rs.500 cashback credited on your first UPI payment! T&C apply
+expect: none
+
+== loan offer is skipped
+kind: sms
+from: VM-HDFCBK-S
+text: Pre-approved personal loan of Rs.5,00,000 is ready for you! Apply now: https://hdfc.bank/pl
+expect: none
+
+== failed payment is skipped
+kind: sms
+from: JD-SBIUPI-S
+text: Your UPI transaction of Rs.500.00 to SWIGGY has failed. Amount if debited will be refunded in 3 working days.
+expect: none
+
+== mandate set-up notice is skipped
+kind: sms
+from: VM-HDFCBK-S
+text: You have successfully created a UPI mandate on SPOTIFY for Rs.119.00 every month from HDFC Bank A/c XX1234.
+expect: none
+
+== executed mandate is a real debit
+kind: sms
+from: VM-HDFCBK-S
+text: Rs.119.00 debited from A/c XX1234 on 21-11-26 for UPI mandate SPOTIFY. UPI Ref 432112345612
+amount: 119.00
+dir: out
+account: 1234
+party: SPOTIFY
+ref: 432112345612
+channel: upi
+
+== personal phone number is skipped
+kind: sms
+from: +919876543210
+text: Sent Rs.500 to you on GPay. Ref 432112345613
+expect: none
+
+== balance alert is skipped
+kind: sms
+from: VM-HDFCBK-S
+text: Avl Bal in A/c XX1234 is INR 12,345.67 as on 21-11-26 08:00 AM
+expect: none
+
+== collect request is skipped
+kind: sms
+from: VM-HDFCBK-S
+text: RAVI KUMAR has requested money from you on UPI. Rs 250.00 will be debited on approving. Ignore if not you.
+expect: none
+
+== inr without a space, payee account masked
+kind: sms
+from: VM-PNBSMS
+text: Your a/c no. XXXXXXXX1234 is debited for INR500.00 on 21-11-26 and credited to a/c no. XXXXXXXX5678 (UPI Ref no 432112345614)
+amount: 500.00
+dir: out
+account: 1234
+party: -
+ref: 432112345614
+channel: upi
+
+== rupee sign with lakh grouping over imps
+kind: sms
+from: VM-HDFCBK
+text: ₹ 1,23,456.78 debited from A/c XX1234 to RENT HOUSE OWNER on 01-11-26 via IMPS. Ref 432112345615
+amount: 123456.78
+dir: out
+account: 1234
+party: RENT HOUSE OWNER
+ref: 432112345615
+channel: netbanking
+
+== gpay paid
+kind: app
+from: gpay
+title: ₹500 paid to Swiggy
+text: Paid from HDFC Bank •• 1234
+amount: 500.00
+dir: out
+account: 1234
+party: Swiggy
+channel: upi
+
+== gpay received
+kind: app
+from: gpay
+title: Ravi Kumar
+text: Ravi Kumar paid you ₹250
+amount: 250.00
+dir: in
+account: -
+party: Ravi Kumar
+channel: upi
+
+== gpay request is skipped
+kind: app
+from: gpay
+title: Ravi Kumar requested ₹250
+text: Tap to pay
+expect: none
+
+== gpay reward is skipped
+kind: app
+from: gpay
+title: You won ₹15 cashback
+text: Scratch card from your last payment
+expect: none
+
+== phonepe paid
+kind: app
+from: phonepe
+title: Paid ₹500 to Swiggy
+text: Debited from HDFC Bank - 1234
+amount: 500.00
+dir: out
+account: 1234
+party: Swiggy
+channel: upi
+
+== phonepe received
+kind: app
+from: phonepe
+title: Received ₹250 from Ravi Kumar
+text: Credited to SBI - 0937
+amount: 250.00
+dir: in
+account: 0937
+party: Ravi Kumar
+channel: upi
+
+== paytm paid
+kind: app
+from: paytm
+title: Paid Rs.120 to Chai Point
+text: Payment successful
+amount: 120.00
+dir: out
+party: Chai Point
+channel: upi
+
+== paytm received
+kind: app
+from: paytm
+title: Payment Received
+text: Rs 250 received from Ravi Kumar in your Bank A/c
+amount: 250.00
+dir: in
+account: -
+party: Ravi Kumar
+channel: upi
+
+== paytm offer is skipped
+kind: app
+from: paytm
+title: Get up to ₹100 cashback
+text: on your next recharge. Offer ends tonight
+expect: none
+
+== shared upi receipt
+kind: share
+text: Paid ₹340 to Blue Tokai Coffee via UPI. Ref 6543210987
+amount: 340.00
+dir: out
+party: Blue Tokai Coffee
+ref: 6543210987
+channel: upi
+
+== shared text with only an amount
+kind: share
+text: ₹999 Myntra order
+amount: 999.00
+dir: out
+party: -
+
+== shared text without an amount
+kind: share
+text: See you at 5
+expect: none

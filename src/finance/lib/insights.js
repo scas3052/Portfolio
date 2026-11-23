@@ -26,7 +26,7 @@ const TIPS = [
   { title: 'Swipe an entry left', body: 'Drag any entry to the left to delete it. Undo is one tap away.' },
   { title: 'Keyboard first', body: 'N logs a spend, I logs income, H hides amounts and 1–8 switch pages.' },
   { title: 'Hide your numbers', body: 'Tap the eye (or press H) before you show your screen to someone.' },
-  { title: 'Back up your book', body: 'Everything lives in this browser only. Export a JSON backup from Settings now and then.' },
+  { title: 'Back up your book', body: 'A JSON backup from Settings restores your whole book on any device. Download one now and then.' },
   { title: 'Flip the cards', body: 'Tap an account card to flip it and see that account’s money in and out this month.' },
 ]
 
@@ -110,6 +110,39 @@ export function buildInsights(state, derived, today) {
           : `Keep it ready in ${account ? account.name : 'your account'}. Tap below once it’s debited.`,
         action: { label: 'Log EMI', kind: 'emi', loanId: loan.id },
         priority: 90 - status.daysToDue,
+      })
+    }
+  }
+
+  // Credit card bills: overdue first, then anything due within a week.
+  for (const [accountId, bill] of derived.cardBills) {
+    if (!(bill.billDue > 0)) continue
+    const { name } = derived.lookups.accounts.get(accountId)
+    const action = { label: 'Pay the bill', kind: 'paycard', accountId, amount: bill.billDue }
+    if (bill.overdue) {
+      cards.push({
+        id: `card-late-${accountId}`,
+        tone: 'coral',
+        icon: LuSiren,
+        kicker: 'Card bill overdue',
+        title: `${name} bill was due ${inDays(bill.daysToDue)}`,
+        body: `${formatINR(bill.billDue)} from the ${shortDate(bill.statement)} bill is still unpaid. Pay it to stop interest and late fees.`,
+        action,
+        priority: 100,
+      })
+    } else if (bill.daysToDue <= 7) {
+      cards.push({
+        id: `card-soon-${accountId}`,
+        tone: 'butter',
+        icon: LuCalendarClock,
+        kicker: 'Card bill due',
+        title: `${name}: ${formatINR(bill.billDue)} due ${inDays(bill.daysToDue)}`,
+        body:
+          bill.unbilled > 0
+            ? `From the ${shortDate(bill.statement)} bill. The ${formatINR(bill.unbilled)} spent since goes on the ${shortDate(bill.nextStatement)} bill.`
+            : `From the ${shortDate(bill.statement)} bill. New spends go on the ${shortDate(bill.nextStatement)} bill.`,
+        action,
+        priority: 90 - bill.daysToDue,
       })
     }
   }

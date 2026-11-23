@@ -4,12 +4,14 @@ import { formatINR, plural } from '../lib/format'
 import { stamp, uid } from '../lib/id'
 import { navigate } from '../lib/router'
 import { portfolioBackground } from '../lib/storage'
-import { useFinance, useUi } from '../store/contexts'
+import { useApp, useFinance, useUi } from '../store/contexts'
 
 /** Shared commands used by several views, the palette and the insight deck. */
 export function useActions() {
   const { state, dispatch, derived, today } = useFinance()
   const ui = useUi()
+  // The app's web view can't download files, so the app saves them through Android's share sheet.
+  const saveFile = useApp()?.saveFile
 
   const addEntry = (prefill = {}) => ui.openSheet('txn', { prefill })
   const editEntry = (txn) => ui.openSheet('txn', { txn })
@@ -63,6 +65,14 @@ export function useActions() {
       case 'emi':
         addEntry({ type: 'emi', loanId: action.loanId })
         break
+      case 'paycard': {
+        // Pay from wherever this card was last paid from; otherwise the form picks.
+        const last = derived.sorted.find(
+          (t) => t.type === 'transfer' && t.toAccountId === action.accountId && derived.lookups.accounts.has(t.accountId),
+        )
+        addEntry({ type: 'transfer', accountId: last?.accountId, toAccountId: action.accountId, amount: action.amount })
+        break
+      }
       case 'collect':
       case 'repay': {
         const person = derived.people.find((p) => p.id === action.personId)
@@ -86,12 +96,24 @@ export function useActions() {
   }
 
   const exportJSON = () => {
-    downloadText(`gullak-backup-${today}.json`, backupJSON(state, new Date().toISOString()))
+    const name = `gullak-backup-${today}.json`
+    const text = backupJSON(state, new Date().toISOString())
+    if (saveFile) {
+      saveFile(name, text, 'application/json').catch(() => ui.toast('Couldn’t save the backup.', { tone: 'rose' }))
+      return
+    }
+    downloadText(name, text)
     ui.toast('Backup downloaded. Keep it somewhere safe.', { tone: 'lime' })
   }
 
   const exportCSV = () => {
-    downloadText(`gullak-entries-${today}.csv`, transactionsCSV(state), 'text/csv')
+    const name = `gullak-entries-${today}.csv`
+    const text = transactionsCSV(state)
+    if (saveFile) {
+      saveFile(name, text, 'text/csv').catch(() => ui.toast('Couldn’t save the CSV.', { tone: 'rose' }))
+      return
+    }
+    downloadText(name, text, 'text/csv')
     ui.toast(`Exported ${plural(state.transactions.length, 'entry', 'entries')} as CSV`, { tone: 'lime' })
   }
 

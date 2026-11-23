@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useDragControls, useIsPresent } from 'motion/react'
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { LuArrowDown, LuEraser, LuSettings, LuX } from 'react-icons/lu'
+import { LuArrowDown, LuEraser, LuPaperclip, LuSettings, LuX } from 'react-icons/lu'
 import { useAgentConfig } from '../../agent/agentConfig'
 import { useMediaQuery } from '../../hooks/useMediaQuery'
 import { cx } from '../../lib/cx'
@@ -82,9 +82,13 @@ export default function AgentPanel({ agent, finance, actions, onClose }) {
     page.current?.scrollTo({ top: page.current.scrollHeight, behavior: 'smooth' })
   }
 
+  // A captured payment attached from its card (Android app) rides along with the next message.
+  const focus = ui.agentFocus
   const ask = (text) => {
     stick.current = true
-    return send(text)
+    const sent = send(text, focus ? { context: focus.context, chip: focus.label } : undefined)
+    if (sent && focus) ui.clearAgentFocus()
+    return sent
   }
 
   const askPass = useCallback(() => {
@@ -234,8 +238,21 @@ export default function AgentPanel({ agent, finance, actions, onClose }) {
           )}
         </AnimatePresence>
 
+        {focus && (
+          <div className="g-mk-focus" role="status">
+            <LuPaperclip aria-hidden="true" />
+            <span className="g-mk-focus__label">
+              About <strong>{focus.label}</strong>
+            </span>
+            <button type="button" className="g-mk-focus__drop g-press" onClick={ui.clearAgentFocus} aria-label="Remove the attached payment">
+              <LuX aria-hidden="true" />
+            </button>
+          </div>
+        )}
+
         <Composer
           busy={busy}
+          placeholder={focus ? 'What was it for? e.g. “dinner, split with Ravi”' : undefined}
           onSend={ask}
           onStop={stop}
           voiceLang={config.voiceLang}

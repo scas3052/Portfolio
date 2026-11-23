@@ -10,10 +10,14 @@ const obj = (properties, required) => ({ type: 'object', properties, ...(require
 const month = str('YYYY-MM, default this month')
 
 const ENTRY = {
-  type: { type: 'string', enum: ENTRY_TYPES },
+  type: {
+    type: 'string',
+    enum: ENTRY_TYPES,
+    description: 'expense: I spent; income: I earned; lend: I gave or paid for someone; borrow: someone gave me or paid for me; collect: someone paid me back; repay: I paid someone back',
+  },
   amount: num('Rupees'),
   category: str('Category id; expense/income only'),
-  account: str('Account paid from / received in (transfer: source)'),
+  account: str('Account paid from / received in (transfer: source); "none" if no account of mine was used'),
   toAccount: str('Transfer destination'),
   person: str('Name, for lend/borrow/collect/repay'),
   loan: str('Loan name, for emi'),
@@ -50,7 +54,7 @@ export const TOOLS = {
     parameters: obj({ expression: str('e.g. "(45000-12000)/3" or "18% of 2500"') }, ['expression']),
   },
   get_accounts: {
-    description: 'Accounts with balances and this month’s money in/out.',
+    description: 'Accounts with balances, this month’s money in/out, and each credit card’s last bill, due date and unbilled spends.',
     parameters: obj({}),
   },
   get_people: {
@@ -104,7 +108,8 @@ export const TOOLS = {
         tenure: num('Total EMIs'),
         paidBefore: num('EMIs already paid'),
         startMonth: str('YYYY-MM of first EMI'),
-        dueDay: num('Day of month EMI is due'),
+        statementDay: num('Credit card: day of month the bill is generated'),
+        dueDay: num('Day of month the EMI or card bill is due'),
         rate: num('Interest % a year'),
         principal: num('Loan amount'),
         account: str('Account EMIs are paid from'),
@@ -117,37 +122,103 @@ export const TOOLS = {
   },
 }
 
+// Only in the Android app, and only while captured payments wait to be filed.
+TOOLS.get_unfiled_spends = {
+  description: 'Captured bank/UPI payments waiting to be filed: ref (S1…), amount, in/out, payee, account, time, the user’s note and a suggestion.',
+  parameters: obj({}),
+}
+TOOLS.propose_file_spend = {
+  description:
+    'Draft filing a captured payment as entries the user confirms. A split is several entries adding up to the payment (e.g. expense 250 + lend 250 to Ravi). Account and date default to the payment’s. Or pass linkTo when it is already in the book.',
+  parameters: obj(
+    {
+      spend: str('Ref like S1, or the id'),
+      entries: { type: 'array', items: obj(ENTRY, ['type']) },
+      linkTo: str('Id of an existing entry that already records this payment'),
+    },
+    ['spend'],
+  ),
+}
+TOOLS.propose_dismiss_spend = {
+  description: 'Draft dropping a captured payment that isn’t a real spend (a duplicate, a test, already logged).',
+  parameters: obj({ spend: str('Ref like S1, or the id'), reason: str('Short reason') }, ['spend']),
+}
+TOOLS.propose_spend_rule = {
+  description: 'Draft a rule so a payee’s payments are always suggested the same way ("always file Swiggy as food").',
+  parameters: obj(
+    {
+      spend: str('Ref of a payment from that payee'),
+      payee: str('Payee name, when there is no payment to point at'),
+      type: { type: 'string', enum: ['expense', 'income'] },
+      category: str('Category id'),
+      note: str('Note to suggest'),
+    },
+    ['category'],
+  ),
+}
+
 export const READ_TOOLS = new Set(['get_accounts', 'get_people', 'get_loans', 'get_budgets', 'get_goals'])
-export const WRITE_TOOLS = new Set(['propose_entries', 'propose_update_entry', 'propose_delete_entry', 'propose_budget', 'propose_goal_contribution', 'propose_setup'])
+export const SPEND_READ_TOOLS = new Set(['get_unfiled_spends'])
+export const SPEND_WRITE_TOOLS = new Set(['propose_file_spend', 'propose_dismiss_spend', 'propose_spend_rule'])
+export const WRITE_TOOLS = new Set([
+  'propose_entries',
+  'propose_update_entry',
+  'propose_delete_entry',
+  'propose_budget',
+  'propose_goal_contribution',
+  'propose_setup',
+  ...SPEND_WRITE_TOOLS,
+])
 const CORE = ['get_overview', 'query_transactions', 'calculate']
 
 const WRITE_VERB =
   /\b(spent|spend|spending|paid|pay|bought|buy|ordered|got|received|receive|earned|credited|salary|lent|lend|gave|give|borrowed|borrow|took|repaid|returned|transferred|transfer|moved|sent|send|deposited|withdrew|withdrawn|add|log|record|put|saved|contribute|emi)\b/
 const QUESTION = /^(what|whats|what's|how|why|when|where|which|who|whom|whose|is|are|am|do|does|did|should|will|would|have|has|show|list|tell|compare|explain|summari[sz]e|give me)\b/
 const POLITE = /^(can|could|would|will) you\b|^please\b/
+// Asking to change the book, however politely, is never a read-only question.
+const ACTION_VERB =
+  /\b(delete|remove|edit|change|update|fix|correct|rename|create|set|add|make|undo|move|log|record|split|mark|cancel|hata|hatao|badal|badlo|mita|mitao|jod|jodo|daalo|daal do|likho|likh do|kar ?do)\b/
+// A reply that goes along with (or turns down) what Munshi just offered.
+const CONFIRM = /^(yes|yeah|yep|yup|ya|ok+|okay|sure|alright|do it|go ahead|please do|confirm|correct|right|no|nope|nah|ha+n?|ji|th?(?:ee|e|i)k hai|kar ?do|karo|nahi|nahin)\b/
+// Only these bring in propose_setup, the largest schema.
+const SETUP_WORDS = /\b(new|account|accounts|card|wallet|loan|goal|jar|open|opened|set ?up)\b/
 const AMOUNT = /\d/
 // Years, ISO dates and "5th" aren't amounts.
 const DATEISH = /\b(19|20)\d\d(-\d\d){0,2}\b|\b\d{1,2}(st|nd|rd|th)\b/g
 
+const lower = (text) => String(text ?? '').trim().toLowerCase()
+
 /** The likely intent of a message: 'write', 'read' or 'any'. */
 export function intentOf(text) {
-  const t = String(text ?? '').trim().toLowerCase()
-  if (!t) return 'any'
+  const t = lower(text)
+  if (!t || CONFIRM.test(t)) return 'any'
   const asks = t.includes('?') || QUESTION.test(t)
   const polite = POLITE.test(t)
   const amount = AMOUNT.test(t.replace(DATEISH, ' '))
   if (WRITE_VERB.test(t) && (amount || /\bemi\b/.test(t)) && (!asks || polite)) return 'write'
-  if ((asks || polite) && !amount) return 'read'
+  if ((asks || polite) && !amount && !ACTION_VERB.test(t)) return 'read'
   return 'any'
 }
 
 const asTool = (name) => ({ type: 'function', function: { name, ...TOOLS[name] } })
 
-/** The tool list to send for a message: a smaller set when the intent is clear, to save tokens. */
-export function toolsFor(text) {
-  const intent = intentOf(text)
-  let names = Object.keys(TOOLS)
-  if (intent === 'write') names = [...CORE, ...WRITE_TOOLS]
-  else if (intent === 'read') names = [...CORE, ...READ_TOOLS]
-  return names.map(asTool)
+/**
+ * The tool list to send for a message: a smaller set when the intent is clear, to save tokens.
+ * An answer to Munshi's own question (`followUp`) continues an earlier request, so it gets every tool.
+ * `spends` adds the captured-payment tools (Android app, with payments waiting).
+ */
+export function toolsFor(text, { followUp = false, spends = false } = {}) {
+  const intent = followUp ? 'any' : intentOf(text)
+  let keep = () => true
+  if (intent === 'read') keep = (name) => CORE.includes(name) || READ_TOOLS.has(name)
+  else if (intent === 'write') {
+    const setup = SETUP_WORDS.test(lower(text))
+    // get_people lets Munshi check who owes whom before drafting a collect or repay.
+    keep = (name) => CORE.includes(name) || name === 'get_people' || (WRITE_TOOLS.has(name) && (setup || name !== 'propose_setup'))
+  }
+  // Captured-payment tools only exist in the app, and only while payments wait to be filed.
+  const spendTool = (name) => SPEND_READ_TOOLS.has(name) || SPEND_WRITE_TOOLS.has(name)
+  const allowed = (name) =>
+    spendTool(name) ? spends && (intent !== 'read' || SPEND_READ_TOOLS.has(name)) : keep(name)
+  return Object.keys(TOOLS).filter(allowed).map(asTool)
 }

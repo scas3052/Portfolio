@@ -31,7 +31,7 @@ import { formatPercent, plural } from '../lib/format'
 import { buildInsights } from '../lib/insights'
 import { hrefFor, navigate } from '../lib/router'
 import { categoryBreakdown, monthlySeries, summarize, txnsInMonth } from '../lib/selectors'
-import { useFinance, useUi } from '../store/contexts'
+import { useApp, useFinance, useUi } from '../store/contexts'
 
 /** Days this month without a single spend, and the current run of them. */
 function noSpendStats(transactions, today, firstDate) {
@@ -183,6 +183,8 @@ export default function Overview() {
     () => noSpendStats(state.transactions, today, firstDate),
     [state.transactions, today, firstDate],
   )
+  // The Android app adds notes here: unfiled spends to file, capture to switch on, an update to install.
+  const HomeNotes = useApp()?.slots?.home
   const topAccounts = useMemo(
     () =>
       state.accounts
@@ -223,6 +225,7 @@ export default function Overview() {
         tone="lime"
         sub="Everything your money is doing, on one sheet of paper."
       />
+      {HomeNotes && <HomeNotes />}
 
       <div className="g-bento">
         {needsSetup && <Setup state={state} index={0} />}

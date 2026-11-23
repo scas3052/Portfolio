@@ -18,6 +18,7 @@ import { isISODate } from '../../lib/dates'
 import { MOD_KEY } from '../../lib/dom'
 import { formatINR, plural, round2 } from '../../lib/format'
 import { frequentEntries, recentAccountId } from '../../lib/selectors'
+import { undoAlso } from '../../lib/undo'
 import { useFinance, useUi } from '../../store/contexts'
 import { Avatar, Segmented, Sticker } from '../bits'
 import { Money } from '../Money'
@@ -139,7 +140,7 @@ function OweHint({ person, type, onFill }) {
   )
 }
 
-function TxnEditor({ txn, prefill, round, onDone, onAnother, onSaved }) {
+function TxnEditor({ txn, prefill, round, onDone, onAnother, onSaved, onUndo }) {
   const { state, dispatch, derived, today } = useFinance()
   const ui = useUi()
   const { deleteEntry } = useActions()
@@ -220,7 +221,7 @@ function TxnEditor({ txn, prefill, round, onDone, onAnother, onSaved }) {
       personId: newPerson === null ? draft.personId : '',
       personName: newPerson || '',
     }
-    const { record } = commitEntry({ dispatch, derived, ui }, input, { original: txn || null })
+    const { record } = commitEntry({ dispatch, derived, ui: onUndo ? undoAlso(ui, onUndo) : ui }, input, { original: txn || null })
     onSaved?.(record)
 
     if (another) onAnother({ type, date: draft.date, accountId: draft.accountId, toAccountId: draft.toAccountId })
@@ -503,8 +504,11 @@ function TxnEditor({ txn, prefill, round, onDone, onAnother, onSaved }) {
   )
 }
 
-/** New or edited money entry. "Save & add another" remounts a fresh editor. */
-export default function TxnForm({ txn, prefill, onDone, onSaved }) {
+/**
+ * New or edited money entry. "Save & add another" remounts a fresh editor. `onSaved(record)` and
+ * `onUndo()` only apply to the first entry (filing a captured payment uses both).
+ */
+export default function TxnForm({ txn, prefill, onDone, onSaved, onUndo }) {
   const [round, setRound] = useState({ n: 0, prefill })
   return (
     <TxnEditor
@@ -514,6 +518,7 @@ export default function TxnForm({ txn, prefill, onDone, onSaved }) {
       round={round.n}
       onDone={onDone}
       onSaved={round.n === 0 ? onSaved : undefined}
+      onUndo={round.n === 0 ? onUndo : undefined}
       onAnother={(carry) => setRound((current) => ({ n: current.n + 1, prefill: carry }))}
     />
   )

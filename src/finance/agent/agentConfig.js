@@ -7,7 +7,9 @@ const PASS_KEY = 'gullak:agent:pass'
 const CHAT_KEY = 'gullak:agent:chat'
 const CHAT_LIMIT = 50
 
-export const DEFAULT_ENDPOINT = '/api/agent'
+// The site's own relay. The Android app is built with VITE_AGENT_ENDPOINT set to the site's full address,
+// since the app itself isn't served from that site. (The `import.meta.env &&` guard keeps Node tests happy.)
+export const DEFAULT_ENDPOINT = (import.meta.env && import.meta.env.VITE_AGENT_ENDPOINT) || '/api/agent'
 const DEFAULTS = { endpoint: DEFAULT_ENDPOINT, provider: '', quickAdd: true, voiceLang: 'en-IN' }
 
 const listeners = new Set()

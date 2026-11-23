@@ -20,6 +20,7 @@ import {
 } from '../../agent/agentConfig'
 import { describeError, getRelayStatus, testConnection } from '../../agent/client'
 import { cx } from '../../lib/cx'
+import { onThisDevice } from '../../lib/where'
 import { useUi } from '../../store/contexts'
 
 const MIN = 12
@@ -334,7 +335,7 @@ export default function AssistantSettings() {
 
       <p className="g-settings__fine">
         Questions and the few numbers needed to answer them go through your relay to the AI provider. The passphrase and
-        chat stay in this browser and are never part of backups.
+        chat stay {onThisDevice()} and are never part of backups.
       </p>
     </>
   )

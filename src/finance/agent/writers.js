@@ -144,6 +144,26 @@ function guessKind(text) {
 
 const duplicate = (list, name) => list.some((item) => norm(item.name) === norm(name))
 
+/** 20, "20" or "20th" → 20; anything that isn't a day of the month → 0. */
+function dayArg(value) {
+  const day = Math.round(parseMoney(String(value ?? '').replace(/(\d)\s*(?:st|nd|rd|th)\b/gi, '$1')))
+  return day >= 1 && day <= 31 ? day : 0
+}
+
+/** A credit card's bill cycle needs both days; half of one is dropped with a warning. */
+function cardCycle(args, warnings) {
+  if (!given(args.statementDay) && !given(args.dueDay)) return null
+  const statementDay = dayArg(args.statementDay)
+  const dueDay = dayArg(args.dueDay)
+  if (statementDay && dueDay) return { statementDay, dueDay }
+  if ((given(args.statementDay) && !statementDay) || (given(args.dueDay) && !dueDay)) {
+    warnings.push('Bill and due days should be 1–31; left blank')
+  } else {
+    warnings.push(`Add the ${statementDay ? 'due' : 'bill'} day to track bills; left blank`)
+  }
+  return null
+}
+
 function setupAccount(args, ctx, name, warnings, needs) {
   const asked = cleanText(args.accountKind, 20).toLowerCase()
   const bank = cleanText(args.bank, 40)
@@ -164,8 +184,11 @@ function setupAccount(args, ctx, name, warnings, needs) {
   const cash = kind === 'cash'
   // Same shape as a saved account: a credit card's opening balance is what you owe, negated.
   const prefill = { name, kind, bank: cash ? '' : bank, last4: cash ? '' : last4, opening: round2(kind === 'credit' ? -balance : balance) || 0 }
+  const cycle = kind === 'credit' ? cardCycle(args, warnings) : null
+  if (cycle) Object.assign(prefill, cycle)
   const shown = kind === 'credit' ? `${formatINR(balance)} due` : `balance ${formatINR(balance)}`
-  return { prefill, summary: `New ${accountKindLabel(kind)} account · ${name}${prefill.bank ? ` (${prefill.bank})` : ''} · ${shown}` }
+  const days = cycle ? ` · bill day ${cycle.statementDay}, due day ${cycle.dueDay}` : ''
+  return { prefill, summary: `New ${accountKindLabel(kind)} account · ${name}${prefill.bank ? ` (${prefill.bank})` : ''} · ${shown}${days}` }
 }
 
 function setupLoan(args, ctx, name, warnings, needs) {

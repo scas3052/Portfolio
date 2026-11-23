@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { executeTool, fitResult } from '../../src/finance/agent/executors.js'
-import { makeCtx } from '../helpers/ctx.mjs'
+import { buildSample } from '../../src/finance/lib/sample.js'
+import { makeCtx, TODAY } from '../helpers/ctx.mjs'
 
 const run = (name, args = {}, ctx = makeCtx()) => executeTool(name, typeof args === 'string' ? args : JSON.stringify(args), ctx)
 const read = (name, args, ctx) => run(name, args, ctx).result
@@ -58,6 +59,26 @@ test('readers answer from the live book without writing anything', () => {
   assert.deepEqual(read('get_accounts', {}, ctx).totals, { cash: 229650, creditDue: 19937 })
   assert.equal(read('get_goals', {}, ctx).goals.length, 3)
   assert.deepEqual(ctx.actions, [])
+})
+
+test('with bill days set, readers split a card’s last bill from spends waiting for the next one', () => {
+  const unset = read('get_accounts', {}).accounts.find((a) => a.kind === 'credit')
+  assert.deepEqual([unset.billCycle, unset.lastBill], ['not set (Accounts → tap the card → Edit)', undefined])
+
+  const sample = buildSample(TODAY)
+  const state = { ...sample, accounts: sample.accounts.map((a) => (a.id === 'sa_icici' ? { ...a, statementDay: 20, dueDay: 5 } : a)) }
+  const ctx = makeCtx({ state })
+  const overview = read('get_overview', {}, ctx)
+  assert.deepEqual(overview.cardBillsDue, [{ card: 'Amazon Pay ICICI', amount: 7424, due: '2026-11-05', overdue: true }])
+  assert.deepEqual([overview.positionNow.creditCardDue, overview.positionNow.cardBillsDue, overview.positionNow.cardUnbilled], [19937, 7424, 12513])
+
+  const accounts = read('get_accounts', {}, ctx)
+  const card = accounts.accounts.find((a) => a.kind === 'credit')
+  assert.deepEqual(
+    [card.lastBill, card.unbilled, card.nextBillOn],
+    [{ on: '2026-10-20', amount: 7424, leftToPay: 7424, payBy: '2026-11-05', overdue: true }, 12513, '2026-11-20'],
+  )
+  assert.deepEqual(accounts.totals, { cash: 229650, creditDue: 19937, cardBillsDue: 7424, unbilled: 12513 })
 })
 
 test('query_transactions filters, totals, groups and lists', () => {
@@ -147,6 +168,18 @@ test('propose_setup prefills the right form and asks for what is missing', () =>
   assert.equal(run('propose_setup', { kind: 'goal', name: 'House' }).drafts[0].needsEdit, 'Target amount?')
   const house = run('propose_setup', { kind: 'goal', name: 'House', target: 500000, deadline: 'march' }).drafts[0]
   assert.deepEqual(house.data.prefill, { name: 'House', target: 500000, saved: 0, deadline: '2027-03' })
+})
+
+test('propose_setup takes a card’s bill and due days only as a pair', () => {
+  const card = run('propose_setup', { kind: 'account', name: 'HDFC credit card', statementDay: 20, dueDay: '5th' }).drafts[0]
+  assert.deepEqual(card.data.prefill, { name: 'HDFC credit card', kind: 'credit', bank: '', last4: '', opening: 0, statementDay: 20, dueDay: 5 })
+  assert.equal(card.summary, 'New Credit card account · HDFC credit card · ₹0 due · bill day 20, due day 5')
+
+  const half = run('propose_setup', { kind: 'account', name: 'HDFC credit card', statementDay: 20 }).drafts[0]
+  assert.deepEqual([half.data.prefill.statementDay, half.warnings], [undefined, ['Add the due day to track bills; left blank']])
+  const bad = run('propose_setup', { kind: 'account', name: 'HDFC credit card', statementDay: 40, dueDay: 5 }).drafts[0]
+  assert.deepEqual([bad.data.prefill.dueDay, bad.warnings], [undefined, ['Bill and due days should be 1–31; left blank']])
+  assert.equal(run('propose_setup', { kind: 'account', name: 'Kotak savings', statementDay: 20, dueDay: 5 }).drafts[0].data.prefill.statementDay, undefined)
 })
 
 test('propose_update_entry and propose_delete_entry work from real ids', () => {

@@ -32,6 +32,7 @@ test('people rows tell a known person from a new one, or show a gap to fill', ()
   assert.deepEqual(person({ person: 'Priya' }), ['Person', 'Priya (new)'])
   assert.deepEqual(person({}), ['Person', '—'])
   assert.deepEqual(entry({ type: 'lend', amount: 300, person: 'Priya', date: '2026-11-09' }).rows.at(-1), ['Date', 'Yesterday'])
+  assert.deepEqual(entry({ type: 'borrow', amount: 300, person: 'Ravi', account: 'none' }).rows, [['Person', 'Ravi'], ['Account', 'Not linked'], ['Date', 'Today']])
 })
 
 test('edit cards list only what changes, with the old amount alongside', () => {
@@ -99,6 +100,10 @@ test('setup cards preview the new account, loan or jar', () => {
   })
   const card = setup({ kind: 'account', name: 'HDFC Millennia', accountKind: 'credit', balance: -2500 })
   assert.deepEqual([card.amount, card.caption, card.rows[1]], [2500, 'due on the card', ['Kind', 'Credit card']])
+  assert.deepEqual(setup({ kind: 'account', name: 'HDFC Millennia', accountKind: 'credit', statementDay: 20, dueDay: 5 }).rows.slice(2), [
+    ['Bill on', '20 of each month'],
+    ['Due on', '5 of each month'],
+  ])
 
   assert.deepEqual(setup({ kind: 'loan', name: 'Car loan', emi: 12000, tenure: 60, lender: 'HDFC', startMonth: '2026-12', dueDay: 5, account: 'hdfc' }).rows, [
     ['Name', 'Car loan'],

@@ -478,6 +478,11 @@ html[data-fin-theme='ink'] .g-chip--tone {
   transition: transform var(--hold, 1200ms) linear;
 }
 
+.g-hold:disabled {
+  opacity: .45;
+  box-shadow: none;
+}
+
 /* ---------- switch ---------- */
 .g-switch {
   position: relative;
@@ -1169,6 +1174,22 @@ html[data-fin-theme='ink'] .g-chip--tone {
   font-size: clamp(1.25rem, 1rem + 1vw, 1.6rem);
   font-weight: 700;
   letter-spacing: -.03em;
+}
+
+.g-card__sub {
+  min-width: 0;
+  font: 500 .66rem/1.3 var(--font-mono);
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.g-card__balance .g-card__sub .g-money {
+  font-size: inherit;
+  font-weight: 700;
+  letter-spacing: normal;
+  color: var(--ink);
 }
 
 .g-card__bottom {

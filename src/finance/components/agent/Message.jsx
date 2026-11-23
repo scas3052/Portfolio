@@ -5,6 +5,7 @@ import {
   LuCircleCheck,
   LuCircleStop,
   LuKeyRound,
+  LuPaperclip,
   LuRotateCcw,
   LuSparkles,
   LuTriangleAlert,
@@ -17,6 +18,8 @@ import Thinking from './Thinking'
 import { voucherView } from './voucher'
 
 const EDITABLE = new Set(['entry', 'update', 'setup'])
+// A captured payment filed as one entry can open in the usual form; splits are confirmed or redrafted.
+const canEditDraft = (draft) => EDITABLE.has(draft.kind) || (draft.kind === 'spend' && draft.data?.entries?.length === 1)
 
 function clock(at) {
   if (!at) return ''
@@ -39,6 +42,11 @@ function UserChit({ message }) {
     >
       <p className="g-mk-chit" style={{ '--tilt': tilt(message.id) }}>
         {message.text}
+        {message.chip && (
+          <span className="g-mk-chit__chip">
+            <LuPaperclip aria-hidden="true" /> {message.chip}
+          </span>
+        )}
       </p>
     </motion.div>
   )
@@ -131,7 +139,7 @@ function Message({ message, ctx, privacy, busy, hasPass, actions }) {
                 view={voucherView(draft, ctx)}
                 privacy={privacy}
                 busy={Boolean(message.streaming)}
-                canEdit={EDITABLE.has(draft.kind)}
+                canEdit={canEditDraft(draft)}
                 onConfirm={() => actions.confirm(message, draft)}
                 onEdit={() => actions.edit(message, draft)}
                 onDiscard={() => actions.setStatus(message, draft, 'discarded')}

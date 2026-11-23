@@ -48,6 +48,41 @@ test('people entries pick the right direction', () => {
   assert.deepEqual(only('lent 300 to raavi').warnings, ['New person: Raavi (did you mean Ravi?)'])
 })
 
+test('someone paying on the user’s behalf is a borrow that touches no account', () => {
+  const notes = {
+    'Ravi paid 300 for my lunch': 'Paid for lunch',
+    'ravi paid on behalf of me 300 for food': 'Paid for food',
+    'Ravi paid for me 300': 'Paid for me',
+    'Ravi paid 300 for my lunch at Dominos': 'Paid for lunch at Dominos',
+    'Ravi ordered food for me 300': 'Paid for food',
+    'Ravi ne mere liye 300 diye': 'Paid for me',
+    'Ravi ne mere lunch ke liye 300 diye': 'Paid for lunch',
+    'ravi ne mere liye 300 pay kar diye': 'Paid for me',
+  }
+  for (const [text, note] of Object.entries(notes)) {
+    const draft = only(text)
+    assert.deepEqual([draft.data.type, draft.data.amount, draft.data.personId, draft.data.accountId, draft.data.note], ['borrow', 300, 'sp_ravi', '', note], text)
+    assert.deepEqual(draft.warnings, [], text)
+  }
+  const priya = only('Priya ne mere liye 250 ka khana order kiya')
+  assert.deepEqual([priya.data.type, priya.data.personName, priya.data.accountId, priya.data.note], ['borrow', 'Priya', '', 'Paid for khana'])
+
+  const reasons = {
+    'Ravi paid 300 for lunch': 'direction',
+    'Ravi sent 300 for my lunch': 'direction',
+    'Ravi paid for my lunch': 'amount',
+    'Ravi paid 300 for my lunch in cash': 'unlinked',
+    'Ravi paid 300 cash for my lunch': 'unlinked',
+    'my friend paid 300 for my lunch': 'vague',
+    'borrowed 100 from my friend': 'vague',
+    'mere dost ne mere liye 300 diye': 'vague',
+    'Ravi ne mujhe 300 diye': 'hindi',
+    'Ravi ne 300 diye lunch ke liye': 'hindi',
+    'maine Ravi ko 200 diye lunch ke liye': 'hindi',
+  }
+  for (const [text, reason] of Object.entries(reasons)) assert.equal(parse(text).reason, reason, text)
+})
+
 test('settling fills in the full amount owed', () => {
   const draft = only('settled with ravi')
   assert.deepEqual([draft.data.type, draft.data.amount, draft.data.personId], ['collect', 1500, 'sp_ravi'])

@@ -31,8 +31,20 @@ function validate(draft) {
     else if (Math.abs(value) >= 1e10) errors.balance = 'That’s a little too big.'
   }
   if (draft.last4 && !/^\d{4}$/.test(draft.last4)) errors.last4 = 'Four digits, or leave it empty.'
+  if (draft.kind === 'credit' && (draft.statementDay || draft.dueDay)) {
+    const badDay = (value) => !(Number(value) >= 1 && Number(value) <= 31)
+    if (!draft.statementDay) errors.statementDay = 'Add the bill day too, or clear the due day.'
+    else if (badDay(draft.statementDay)) errors.statementDay = 'A day from 1 to 31.'
+    if (!draft.dueDay) errors.dueDay = 'Add the due day too, or clear the bill day.'
+    else if (badDay(draft.dueDay)) errors.dueDay = 'A day from 1 to 31.'
+  }
   return errors
 }
+
+const DAY_FIELDS = [
+  { key: 'statementDay', label: 'Bill generated on', placeholder: '20', hint: 'Day of month. Later spends go on the next bill.' },
+  { key: 'dueDay', label: 'Payment due on', placeholder: '5', hint: 'Day of month. Gullak reminds you before it.' },
+]
 
 /** Add or edit a bank account, wallet, cash pocket or credit card. `prefill` seeds a new one. */
 export default function AccountForm({ account, prefill, onDone, onSaved }) {
@@ -46,6 +58,8 @@ export default function AccountForm({ account, prefill, onDone, onSaved }) {
     kind: seed?.kind || 'savings',
     bank: seed?.bank || '',
     last4: seed?.last4 || '',
+    statementDay: seed?.statementDay ? String(seed.statementDay) : '',
+    dueDay: seed?.dueDay ? String(seed.dueDay) : '',
     balance: account || current ? String(seed.kind === 'credit' ? round2(-current) : current) : '',
     color: account?.color || nextTone('account', state),
   }))
@@ -76,6 +90,9 @@ export default function AccountForm({ account, prefill, onDone, onSaved }) {
       // Keep past entries intact: shift the opening balance so today's balance matches.
       opening: account ? round2(account.opening + target - current) : target,
       color: draft.color,
+      ...(credit && draft.statementDay && draft.dueDay
+        ? { statementDay: Number(draft.statementDay), dueDay: Number(draft.dueDay) }
+        : {}),
     }
     dispatch({ type: account ? 'account/update' : 'account/add', account: record })
     ui.toast(account ? `${record.name} updated` : `${record.name} added`, { tone: 'butter' })
@@ -155,6 +172,28 @@ export default function AccountForm({ account, prefill, onDone, onSaved }) {
               />
             )}
           </Field>
+        </div>
+      )}
+
+      {credit && (
+        <div className="g-form__grid">
+          {DAY_FIELDS.map((day) => (
+            <Field key={day.key} label={day.label} hint={day.hint} error={errors[day.key]}>
+              {(id, describedBy) => (
+                <input
+                  id={id}
+                  className="g-input g-input--mono"
+                  value={draft[day.key]}
+                  inputMode="numeric"
+                  placeholder={day.placeholder}
+                  autoComplete="off"
+                  aria-describedby={describedBy}
+                  aria-invalid={Boolean(errors[day.key]) || undefined}
+                  onChange={(event) => set({ [day.key]: event.target.value.replace(/\D/g, '').slice(0, 2) })}
+                />
+              )}
+            </Field>
+          ))}
         </div>
       )}
 

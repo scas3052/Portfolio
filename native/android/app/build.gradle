@@ -1,0 +1,83 @@
+apply plugin: 'com.android.application'
+
+// Gullak's app module. scripts/android-prepare.mjs copies it over the one Capacitor generates.
+// Version and signing come from the environment (GitHub Actions) or ~/.gradle/gradle.properties,
+// never from the repository:
+//   GULLAK_VERSION_CODE, GULLAK_VERSION_NAME
+//   GULLAK_KEYSTORE_FILE, GULLAK_KEYSTORE_PASSWORD (and optionally GULLAK_KEY_ALIAS, GULLAK_KEY_PASSWORD)
+// Without a keystore the release build is signed with the debug key, which is fine for testing only:
+// updates must always be signed with the same release key.
+def setting = { String name -> System.getenv(name) ?: project.findProperty(name) }
+def keystorePath = setting('GULLAK_KEYSTORE_FILE')
+def keystoreFile = keystorePath ? file(keystorePath) : null
+def hasReleaseKey = keystoreFile != null && keystoreFile.exists()
+
+android {
+    namespace = "com.scas3052.gullak"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.scas3052.gullak"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode((setting('GULLAK_VERSION_CODE') ?: '1') as Integer)
+        versionName setting('GULLAK_VERSION_NAME') ?: '1.0.0-dev'
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+            // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+            // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (hasReleaseKey) {
+                storeFile keystoreFile
+                storePassword setting('GULLAK_KEYSTORE_PASSWORD')
+                keyAlias setting('GULLAK_KEY_ALIAS') ?: 'gullak'
+                keyPassword setting('GULLAK_KEY_PASSWORD') ?: setting('GULLAK_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig hasReleaseKey ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.activity:activity:$androidxActivityVersion"
+    implementation "androidx.core:core:$androidxCoreVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+

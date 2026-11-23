@@ -2,7 +2,7 @@
 // base URLs are ever contacted, so the relay can't be turned into an open proxy.
 // Every model can be overridden with `<ID>_MODEL`, e.g. GROQ_MODEL=qwen/qwen3.8-27b.
 
-const lowReasoning = (pattern) => (model) => (pattern.test(model) ? { reasoning_effort: 'low' } : {})
+const reasoning = (pattern, effort = 'high') => (model) => (pattern.test(model) ? { reasoning_effort: effort } : {})
 
 export const PROVIDERS = [
   {
@@ -12,7 +12,7 @@ export const PROVIDERS = [
     keyEnv: 'GROQ_API_KEY',
     model: 'openai/gpt-oss-120b',
     tokenField: 'max_completion_tokens',
-    extra: lowReasoning(/gpt-oss/i),
+    extra: reasoning(/gpt-oss/i),
   },
   {
     id: 'openrouter',
@@ -30,7 +30,7 @@ export const PROVIDERS = [
     keyEnv: 'CEREBRAS_API_KEY',
     model: 'gpt-oss-120b',
     tokenField: 'max_completion_tokens',
-    extra: lowReasoning(/gpt-oss/i),
+    extra: reasoning(/gpt-oss/i),
   },
   {
     id: 'nvidia',

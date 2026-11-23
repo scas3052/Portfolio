@@ -1,0 +1,442 @@
+/* Gullak cloud sync: sign-in and link sheets, the top bar badge, Settings → Sync and the lock screen. */
+
+/* ---------- shared ---------- */
+.g-sync-spin {
+  animation: g-sync-turn .9s linear infinite;
+}
+
+.g-sync-google {
+  width: 100%;
+}
+
+/* Google's "G" sits on a white coin so it reads on the ink button in both themes. */
+.g-sync-google__g {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  font-size: 1rem;
+  background: #fff;
+  border-radius: 50%;
+}
+
+.g-sync-google__g > svg {
+  display: block;
+}
+
+.g-sync-link__saving,
+.g-sync-set__busy,
+.g-sync-forgot__busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 .78rem/1.3 var(--font-mono);
+  color: var(--ink-2);
+}
+
+/* ---------- sign-in sheet ---------- */
+.g-sync-signin__lead {
+  font: 600 1rem/1.5 var(--font-body);
+}
+
+.g-sync-points {
+  display: grid;
+  gap: 10px;
+}
+
+.g-sync-points > li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 500 .88rem/1.45 var(--font-body);
+  color: var(--ink-2);
+}
+
+.g-sync-points > li:nth-child(4n + 1) {
+  --tone: var(--sky);
+}
+
+.g-sync-points > li:nth-child(4n + 2) {
+  --tone: var(--lilac);
+}
+
+.g-sync-points > li:nth-child(4n + 3) {
+  --tone: var(--butter);
+}
+
+.g-sync-points > li:nth-child(4n + 4) {
+  --tone: var(--mint);
+}
+
+.g-sync-points__icon,
+.g-sync-book__icon,
+.g-sync-choice__icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  font-size: 1rem;
+  color: var(--coal);
+  background: var(--tone);
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-sm);
+}
+
+.g-sync-signin__go {
+  display: grid;
+  gap: 8px;
+}
+
+/* ---------- link sheet: which book to keep ---------- */
+.g-sync-link__books {
+  display: grid;
+  gap: 12px;
+}
+
+@container g-form (min-width: 30rem) {
+  .g-sync-link__books {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.g-sync-book {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  background: color-mix(in srgb, var(--tone) 24%, var(--surface));
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+}
+
+.g-sync-book__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.g-sync-book__head > div {
+  min-width: 0;
+}
+
+.g-sync-book__icon {
+  width: 38px;
+  height: 38px;
+  font-size: 1.15rem;
+}
+
+.g-sync-book__name {
+  overflow: hidden;
+  font: 800 1.02rem/1.2 var(--font-display);
+  letter-spacing: -.02em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.g-sync-book__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 8px;
+  padding: 10px 0;
+  border-block: 2px dashed color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
+.g-sync-book__stats > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.g-sync-book__stats dt {
+  overflow: hidden;
+  font: 600 .62rem/1.2 var(--font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  color: var(--ink-2);
+}
+
+.g-sync-book__stats dd {
+  font: 800 1.15rem/1.1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.g-sync-book__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font: 500 .72rem/1.4 var(--font-mono);
+  color: var(--ink-2);
+}
+
+.g-sync-link__backup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font: 600 .84rem/1.3 var(--font-body);
+  color: var(--ink-2);
+}
+
+.g-sync-link__backup > span {
+  margin-right: auto;
+}
+
+.g-sync-choices {
+  display: grid;
+  gap: 10px;
+}
+
+.g-sync-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r);
+  box-shadow: inset 6px 0 0 var(--tone);
+}
+
+.g-sync-choice__icon {
+  margin-left: 4px;
+}
+
+.g-sync-choice__text {
+  display: grid;
+  gap: 3px;
+}
+
+.g-sync-choice__text > strong {
+  font: 800 1rem/1.25 var(--font-display);
+  letter-spacing: -.01em;
+}
+
+.g-sync-choice__text > p {
+  font: 500 .84rem/1.45 var(--font-body);
+  color: var(--ink-2);
+}
+
+.g-sync-choice__go {
+  grid-column: 2;
+}
+
+.g-sync-choice__go > :is(.g-btn, .g-hold) {
+  width: 100%;
+}
+
+@container g-form (min-width: 34rem) {
+  .g-sync-choice {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .g-sync-choice__go {
+    grid-column: auto;
+  }
+
+  .g-sync-choice__go > :is(.g-btn, .g-hold) {
+    width: auto;
+    min-width: 13rem;
+  }
+}
+
+/* ---------- top bar badge ---------- */
+.g-sync-badge {
+  position: relative;
+}
+
+.g-sync-badge__dot {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 13px;
+  height: 13px;
+  background: var(--tone);
+  border: var(--bw) solid var(--frame);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.g-sync-badge.is-problem .g-sync-badge__dot {
+  animation: g-sync-pulse 1.8s ease-in-out infinite;
+}
+
+/* ---------- Settings → Sync ---------- */
+.g-settings__group--sync {
+  --accent: var(--sky);
+  --tone: var(--sky);
+  scroll-margin-top: 96px;
+}
+
+.g-settings__group--sync.is-spotlit {
+  animation: g-sync-spot 1.6s var(--ease-out) both;
+}
+
+.g-sync-set__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.g-sync-set__state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  font: 700 .74rem/1 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--coal);
+  background: var(--tone);
+  border: var(--bw) solid var(--frame);
+  border-radius: 999px;
+}
+
+.g-sync-set__state > svg {
+  font-size: .9rem;
+}
+
+.g-sync-set__dot {
+  width: 9px;
+  height: 9px;
+  background: var(--coal);
+  border: 1.5px solid var(--coal);
+  border-radius: 50%;
+}
+
+.g-sync-set__state.is-off .g-sync-set__dot {
+  background: transparent;
+}
+
+.g-sync-set__state.is-problem .g-sync-set__dot {
+  animation: g-sync-blink 1.4s ease-in-out infinite;
+}
+
+.g-sync-set__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 8px;
+}
+
+.g-sync-set__facts > div {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 11px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--hair);
+  border-radius: var(--r-sm);
+}
+
+.g-sync-set__facts dt {
+  font: 600 .64rem/1.2 var(--font-mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.g-sync-set__facts dd {
+  overflow-wrap: anywhere;
+  font: 700 .9rem/1.3 var(--font-display);
+}
+
+/* ---------- lock screen: forgot PIN on a syncing device ---------- */
+.g-sync-forgot {
+  width: 100%;
+}
+
+.g-sync-forgot strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+.g-sync-forgot__go {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.g-sync-forgot__or {
+  width: 100%;
+  padding-top: 14px;
+  font-size: .8rem;
+  border-top: 2px dashed var(--hair);
+}
+
+.g-sync-forgot > .g-hold {
+  width: 100%;
+}
+
+/* ---------- welcome: an existing book on another device ---------- */
+.g-welcome__sync {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 11px 14px;
+  font: 500 .86rem/1.4 var(--font-body);
+  text-align: left;
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--sky) 16%, var(--surface));
+  border: 1.5px dashed color-mix(in srgb, var(--ink) 45%, transparent);
+  border-radius: var(--r-sm);
+}
+
+.g-welcome__sync > svg {
+  flex: none;
+  font-size: 1.15rem;
+  color: var(--ink);
+}
+
+.g-welcome__sync strong {
+  font: 800 .9rem/1.4 var(--font-display);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.g-welcome__sync:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--sky) 38%, var(--surface));
+  border-style: solid;
+  border-color: var(--frame);
+}
+
+/* ---------- motion ---------- */
+@keyframes g-sync-turn {
+  to { rotate: 360deg; }
+}
+
+@keyframes g-sync-pulse {
+  0%, 100% { scale: 1; box-shadow: 0 0 0 0 transparent; }
+  50% { scale: 1.2; box-shadow: 0 0 0 4px color-mix(in srgb, var(--tone) 55%, transparent); }
+}
+
+@keyframes g-sync-blink {
+  50% { opacity: .2; }
+}
+
+@keyframes g-sync-spot {
+  0% { box-shadow: var(--shadow); translate: 0 0; }
+  22% { box-shadow: 9px 9px 0 var(--sky), 9px 9px 0 2px var(--frame); translate: -3px -3px; }
+  100% { box-shadow: var(--shadow); translate: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .g-sync-spin,
+  .g-sync-badge.is-problem .g-sync-badge__dot,
+  .g-sync-set__state.is-problem .g-sync-set__dot,
+  .g-settings__group--sync.is-spotlit {
+    animation: none;
+  }
+}

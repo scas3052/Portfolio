@@ -1,7 +1,7 @@
 // The chat behind the Munshi panel: messages, the running turn, offline quick add and persistence.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { uid } from '../lib/id'
-import { useFinance, useUi } from '../store/contexts'
+import { useApp, useFinance, useUi } from '../store/contexts'
 import { clearChat, getAgentConfig, loadChat, onChatCleared, saveChat } from './agentConfig'
 import { buildHistory, runAgent } from './agentLoop'
 import { AgentError, describeError } from './client'
@@ -14,11 +14,14 @@ const reply = (fields) => ({ id: uid('m'), role: 'assistant', text: '', drafts: 
 
 /**
  * Messages are `{id, role:'user', text}` or `{id, role:'assistant', text, drafts, steps,
- * source:'ai'|'quick', meta?, error?, stopped?, streaming?}`. Drafts carry their own `status`.
+ * source:'ai'|'quick', meta?, facts?, error?, stopped?, streaming?}`. Drafts carry their own
+ * `status`, plus `entryId` once an entry draft is saved; `facts` are entries the reply looked up.
  */
 export function useAgent() {
   const finance = useFinance()
   const ui = useUi()
+  const app = useApp()
+  const inbox = app?.inbox || null
   const [messages, setMessages] = useState(loadChat)
   const [busy, setBusy] = useState(false)
   const [unreadAt, setUnreadAt] = useState(0)
@@ -27,7 +30,8 @@ export function useAgent() {
   const controllerRef = useRef(null)
 
   useLayoutEffect(() => {
-    ctxRef.current = { ...finance, ui }
+    // `inbox`: captured payments, in the Android app only.
+    ctxRef.current = { ...finance, ui, inbox }
     messagesRef.current = messages
   })
 
@@ -76,7 +80,15 @@ export function useAgent() {
           },
           onStep: ({ steps, drafts }) => patch(id, { steps, drafts }),
         })
-        patch(id, { text: result.text, drafts: result.drafts, steps: result.steps, meta: result.meta, streaming: false, at: Date.now() })
+        patch(id, {
+          text: result.text,
+          drafts: result.drafts,
+          steps: result.steps,
+          meta: result.meta,
+          facts: result.facts,
+          streaming: false,
+          at: Date.now(),
+        })
       } catch (err) {
         const stopped = err instanceof AgentError && err.code === 'aborted'
         patch(id, (m) =>
@@ -94,15 +106,18 @@ export function useAgent() {
     [patch],
   )
 
-  /** Quick add answers plain entries offline; everything else goes to the model. */
+  /**
+   * Quick add answers plain entries offline; everything else goes to the model. `context` travels with the
+   * message to the model (a captured payment it is about) and `chip` labels that on the user's chit.
+   */
   const send = useCallback(
-    (raw) => {
+    (raw, { context = '', chip = '' } = {}) => {
       const text = String(raw ?? '').trim().slice(0, MAX_INPUT)
       if (!text || controllerRef.current) return false
       const config = getAgentConfig()
       const history = buildHistory(messagesRef.current)
-      const user = { id: uid('m'), role: 'user', text, at: Date.now() }
-      const quick = config.quickAdd ? quickParse(text, ctxRef.current) : null
+      const user = { id: uid('m'), role: 'user', text, at: Date.now(), ...(context ? { context } : {}), ...(chip ? { chip } : {}) }
+      const quick = config.quickAdd && !context ? quickParse(text, ctxRef.current) : null
       const offline = !config.hasPass || navigator.onLine === false
       if (quick?.confident || (offline && quick?.drafts.length)) {
         const note = quick.confident ? '' : OFFLINE_NOTE
@@ -116,7 +131,7 @@ export function useAgent() {
         return true
       }
       setMessages((list) => [...list, user])
-      runAI(text, history)
+      runAI(context ? `${text}\n\n${context}` : text, history)
       return true
     },
     [runAI],
@@ -139,7 +154,7 @@ export function useAgent() {
         return latest ? rest : [...rest, { ...question, id: uid('m'), at: Date.now() }]
       })
       const before = latest ? list.slice(0, ask) : list.filter((m) => m.id !== messageId && m.id !== question.id)
-      runAI(question.text, buildHistory(before))
+      runAI(question.context ? `${question.text}\n\n${question.context}` : question.text, buildHistory(before))
     },
     [runAI],
   )

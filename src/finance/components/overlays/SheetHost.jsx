@@ -1,6 +1,9 @@
 import { AnimatePresence } from 'motion/react'
 import { createPortal } from 'react-dom'
-import { useUi } from '../../store/contexts'
+import { useApp, useUi } from '../../store/contexts'
+import CloudLinkForm from '../cloud/CloudLinkForm'
+import CloudSignInForm from '../cloud/CloudSignInForm'
+import { GetAppSheet } from '../GetApp'
 import AccountForm from '../forms/AccountForm'
 import BudgetForm from '../forms/BudgetForm'
 import ConfirmSheet from '../forms/ConfirmSheet'
@@ -26,12 +29,17 @@ const KINDS = {
   confirm: { Form: ConfirmSheet, tone: 'rose', kicker: 'Check', title: (p) => p.title || 'Are you sure?' },
   more: { Form: MoreMenu, tone: 'tan', kicker: 'Gullak', title: () => 'Everything else' },
   shortcuts: { Form: Shortcuts, tone: 'sky', kicker: 'Speed run', title: () => 'Keyboard shortcuts', wide: true },
+  cloudSignIn: { Form: CloudSignInForm, tone: 'sky', kicker: 'Sync', title: () => 'Sync across devices' },
+  cloudLink: { Form: CloudLinkForm, tone: 'sky', kicker: 'Sync', title: () => 'Which book should we keep?', wide: true },
+  getApp: { Form: GetAppSheet, tone: 'lime', kicker: 'Android', title: () => 'Gullak on your phone' },
 }
 
 /** Renders whichever form sheet is open, with enter/exit animations. */
 export default function SheetHost() {
   const { sheet, closeSheet } = useUi()
-  const config = sheet ? KINDS[sheet.kind] : null
+  // The Android app adds its own sheets (the unfiled spends list).
+  const extra = useApp()?.sheets
+  const config = sheet ? KINDS[sheet.kind] || extra?.[sheet.kind] || null : null
 
   return createPortal(
     <AnimatePresence>

@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'dist-app', 'android']),
   {
     files: ['**/*.{js,jsx,mjs}'],
     extends: [
@@ -19,8 +19,16 @@ export default defineConfig([
     },
   },
   {
-    // Serverless relay, its Vite dev middleware and the Node test suite.
-    files: ['api/**/*.js', 'netlify/**/*.{js,mjs}', 'server/**/*.js', 'tests/**/*.{js,mjs}', 'vite.config.js'],
+    // Serverless functions, the Vite configs and dev middleware, build scripts and the Node test suite.
+    files: [
+      'api/**/*.js',
+      'netlify/**/*.{js,mjs}',
+      'server/**/*.js',
+      'scripts/**/*.{js,mjs}',
+      'tests/**/*.{js,mjs}',
+      'vite.config.js',
+      'vite.app.config.js',
+    ],
     languageOptions: { globals: globals.node },
   },
 ])

@@ -25,10 +25,14 @@ const num = (value, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback
 }
 const tone = (value, index = 0) => (TONES.includes(value) ? value : TONES[index % TONES.length])
+const dayOfMonth = (value) => {
+  const n = Math.round(num(value))
+  return n >= 1 && n <= 31 ? n : 0
+}
 
 function normalizeAccount(raw, index) {
   if (!raw || typeof raw !== 'object' || !raw.id) return null
-  return {
+  const account = {
     id: String(raw.id),
     name: text(raw.name, 40) || 'Account',
     kind: ACCOUNT_KINDS.some((k) => k.id === raw.kind) ? raw.kind : 'savings',
@@ -37,6 +41,11 @@ function normalizeAccount(raw, index) {
     opening: round2(num(raw.opening)),
     color: tone(raw.color, index),
   }
+  // Billing cycle is optional and credit-only; stored only when both days are valid.
+  const statementDay = dayOfMonth(raw.statementDay)
+  const dueDay = dayOfMonth(raw.dueDay)
+  if (account.kind === 'credit' && statementDay && dueDay) Object.assign(account, { statementDay, dueDay })
+  return account
 }
 
 function normalizeTxn(raw) {

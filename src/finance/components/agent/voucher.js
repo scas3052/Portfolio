@@ -34,7 +34,7 @@ function entryRows(data, { derived, today }) {
     rows.push(['From', nameOf(lookups.accounts, data.accountId)])
     rows.push(['To', nameOf(lookups.accounts, data.toAccountId)])
   } else {
-    rows.push(['Account', nameOf(lookups.accounts, data.accountId)])
+    rows.push(['Account', data.accountId ? nameOf(lookups.accounts, data.accountId) : 'Not linked'])
   }
   rows.push(['Date', day(data.date, today)])
   if (data.note) rows.push(['Note', `“${data.note}”`])
@@ -68,6 +68,12 @@ function setupView(setup, prefill, ctx) {
         ['Kind', accountKindLabel(p.kind)],
         ...(p.bank ? [['Bank', p.bank]] : []),
         ...(p.last4 ? [['Ends in', p.last4]] : []),
+        ...(credit && p.statementDay && p.dueDay
+          ? [
+              ['Bill on', `${p.statementDay} of each month`],
+              ['Due on', `${p.dueDay} of each month`],
+            ]
+          : []),
       ],
     }
   }
@@ -96,6 +102,17 @@ function setupView(setup, prefill, ctx) {
       ['By', p.deadline ? monthLabel(p.deadline, 'short') : 'No deadline'],
     ],
   }
+}
+
+/** One entry of a filed payment, as a voucher row: "₹250 · Food", "₹250 · Ravi (new)". */
+function spendEntryText(e, { derived }) {
+  const parts = [e.amount ? formatINR(e.amount) : '₹ ?']
+  if (e.type === 'expense' || e.type === 'income') parts.push(categoryMeta(e.category).label)
+  else if (PEOPLE.has(e.type)) parts.push(nameOf(derived.lookups.people, e.personId, '') || (e.personName ? `${e.personName} (new)` : DASH))
+  else if (e.type === 'emi') parts.push(nameOf(derived.lookups.loans, e.loanId))
+  else if (e.type === 'transfer') parts.push(`to ${nameOf(derived.lookups.accounts, e.toAccountId)}`)
+  if (e.note) parts.push(`“${e.note}”`)
+  return parts.join(' · ')
 }
 
 /**
@@ -167,6 +184,59 @@ export function voucherView(draft, ctx) {
     }
     case 'setup':
       return { was: null, ...setupView(data.setup, data.prefill, ctx) }
+    case 'spend': {
+      const entries = Array.isArray(data.entries) ? data.entries : []
+      const account = entries.find((e) => e.accountId)?.accountId
+      return {
+        title: 'File payment',
+        tone: 'lime',
+        amount: data.amount || null,
+        caption: data.title || '',
+        was: null,
+        rows: [
+          ...entries.map((e) => [TYPE_META[e.type]?.label || 'Entry', spendEntryText(e, ctx)]),
+          ...(account ? [['Account', nameOf(ctx.derived.lookups.accounts, account)]] : []),
+          ['Date', day(data.date, ctx.today)],
+        ],
+      }
+    }
+    case 'spendLink': {
+      const txn = ctx.state.transactions.find((t) => t.id === data.entryId)
+      return {
+        title: 'Already in the book',
+        tone: 'sky',
+        amount: data.amount || null,
+        caption: data.title || '',
+        was: null,
+        rows: [
+          ['Entry', txn ? describeTxn(txn, ctx.derived.lookups).title : 'Removed entry'],
+          ['Date', txn ? day(txn.date, ctx.today) : DASH],
+        ],
+      }
+    }
+    case 'spendDismiss':
+      return {
+        title: 'Not a spend',
+        tone: 'gray',
+        amount: data.amount || null,
+        caption: data.title || '',
+        was: null,
+        rows: [['Date', day(data.date, ctx.today)], ...(data.reason ? [['Why', data.reason]] : [])],
+      }
+    case 'spendRule':
+      return {
+        title: 'Filing rule',
+        tone: 'lilac',
+        amount: null,
+        caption: data.label || '',
+        was: null,
+        rows: [
+          ['Payee', data.label || DASH],
+          ['File as', `${TYPE_META[data.rule?.type]?.label || DASH} · ${categoryMeta(data.rule?.category).label}`],
+          ...(data.rule?.note ? [['Note', `“${data.rule.note}”`]] : []),
+          ...(data.previous ? [['Was', categoryMeta(data.previous.category).label]] : []),
+        ],
+      }
     default:
       break
   }
