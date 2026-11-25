@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAgentConfig } from '../agent/agentConfig'
 import { spendContext } from '../agent/spends'
+import BalanceSheet from '../inbox/BalanceSheet'
 import CaptureSettings from '../inbox/CaptureSettings'
 import InboxBanner from '../inbox/InboxBanner'
 import InboxSheet from '../inbox/InboxSheet'
+import ScanPaySheet from '../inbox/ScanPaySheet'
+import StatementSheet from '../inbox/StatementSheet'
 import { RESUME_EVENT, useInboxState } from '../inbox/useInbox'
 import { plural } from '../lib/format'
 import { LOCK_AFTER_MS } from '../lib/pin'
@@ -18,6 +21,9 @@ const NATIVE = isNativeApp()
 // Sheets and slots the shared screens show only in the app.
 const SHEETS = {
   inbox: { Form: InboxSheet, tone: 'lime', kicker: 'Payments', title: () => 'Unfiled spends', wide: true },
+  scanpay: { Form: ScanPaySheet, tone: 'lime', kicker: 'Payments', title: () => 'Scan & Pay' },
+  statement: { Form: StatementSheet, tone: 'sky', kicker: 'Payments', title: () => 'Import a bank statement', wide: true },
+  balance: { Form: BalanceSheet, tone: 'butter', kicker: 'Weekly check', title: () => 'Balance check' },
 }
 const SLOTS = { home: InboxBanner, settings: CaptureSettings }
 
@@ -147,13 +153,16 @@ function useUpdateCheck() {
   return useMemo(() => ({ ...(result || {}), link: downloadUrl(), checking, recheck }), [result, checking, recheck])
 }
 
-/** Opens a payment from a notification tap or a share, and hands reply notes to Munshi. */
+/**
+ * Opens a payment from a notification tap or a share, opens Scan & Pay or the balance check from the shortcut and
+ * the weekly reminder, and hands reply notes to Munshi.
+ */
 function InboxEffects({ inbox }) {
   const finance = useFinance()
   const { openSheet, askAgent, toast, locked } = useUi()
   const { hasPass } = useAgentConfig()
   const ready = finance.state.settings.onboarded && !locked
-  const { opening, clearOpening, unfiled } = inbox
+  const { opening, clearOpening, intent, clearIntent, unfiled } = inbox
   const live = useRef(finance)
   useLayoutEffect(() => {
     live.current = finance
@@ -165,6 +174,12 @@ function InboxEffects({ inbox }) {
     clearOpening()
     openSheet('inbox', { focus: opening.id })
   }, [opening, ready, clearOpening, openSheet])
+
+  useEffect(() => {
+    if (!intent || !ready) return
+    clearIntent()
+    openSheet(intent.kind === 'balance' ? 'balance' : 'scanpay')
+  }, [intent, ready, clearIntent, openSheet])
 
   // "dinner, split with Ravi" typed on the notification: Munshi drafts the entries when Gullak opens.
   // Without Munshi (no passphrase, or offline) the note waits on the card and fills the entry form.

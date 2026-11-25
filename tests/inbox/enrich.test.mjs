@@ -39,6 +39,14 @@ test('accounts match by their last digits, then by a remembered alias', () => {
   assert.deepEqual([aliased.account.id, aliased.how], ['sa_sbi', 'alias'])
 })
 
+test('the account picked in Gullak (Scan & Pay, a statement import) wins over digits and aliases', () => {
+  const { state } = makeCtx()
+  const chosen = matchAccount(spend({ accountId: 'sa_sbi', account: '4821' }), state.accounts, { 4821: 'sa_hdfc' })
+  assert.deepEqual([chosen.account.id, chosen.how], ['sa_sbi', 'chosen'])
+  assert.equal(matchAccount(spend({ accountId: 'gone', account: '4821' }), state.accounts).account.id, 'sa_hdfc')
+  assert.equal(spend({ accountId: '  ' }).accountId, null)
+})
+
 test('a card spend without digits goes to the one card of that bank', () => {
   const { state } = makeCtx()
   assert.equal(matchAccount(spend({ bank: 'ICICI Bank', channel: 'card' }), state.accounts).account.id, 'sa_icici')

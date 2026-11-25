@@ -29,7 +29,8 @@ public final class SpendStore extends SQLiteOpenHelper {
     public static final String DISMISSED = "dismissed";
 
     private static final String DB_NAME = "gullak_capture.db";
-    private static final int DB_VERSION = 1;
+    /** 2 added account_id: the Gullak account picked for a Scan & Pay payment or a statement import. */
+    private static final int DB_VERSION = 2;
     private static final long DAY_MS = 24L * 60 * 60 * 1000;
     private static final long KEEP_CLOSED_MS = 30 * DAY_MS;
     private static final long KEEP_SEEN_MS = 45 * DAY_MS;
@@ -39,7 +40,7 @@ public final class SpendStore extends SQLiteOpenHelper {
     private static final long APP_SEEN_WINDOW_MS = 5 * 60 * 1000L;
 
     private static final String COLUMNS = "id, status, amount, direction, at, account, party, vpa, ref, channel, bank, balance,"
-            + " sources, raw IS NOT NULL AS has_raw, hint, hint_at, entry_ids, created_at, closed_at";
+            + " sources, raw IS NOT NULL AS has_raw, hint, hint_at, entry_ids, created_at, closed_at, account_id";
 
     private static SpendStore instance;
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -59,7 +60,7 @@ public final class SpendStore extends SQLiteOpenHelper {
                 + " direction TEXT NOT NULL, at INTEGER NOT NULL, account TEXT, party TEXT, vpa TEXT, ref TEXT, channel TEXT,"
                 + " bank TEXT, balance INTEGER NOT NULL DEFAULT -1, sources TEXT NOT NULL, raw TEXT, hint TEXT,"
                 + " hint_at INTEGER NOT NULL DEFAULT 0, entry_ids TEXT, created_at INTEGER NOT NULL,"
-                + " updated_at INTEGER NOT NULL, closed_at INTEGER NOT NULL DEFAULT 0)");
+                + " updated_at INTEGER NOT NULL, closed_at INTEGER NOT NULL DEFAULT 0, account_id TEXT)");
         db.execSQL("CREATE INDEX spends_status_at ON spends(status, at)");
         db.execSQL("CREATE INDEX spends_amount_at ON spends(amount, at)");
         db.execSQL("CREATE TABLE seen (hash TEXT NOT NULL, at INTEGER NOT NULL)");
@@ -68,7 +69,7 @@ public final class SpendStore extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Version 1 is the first schema.
+        if (oldVersion < 2) db.execSQL("ALTER TABLE spends ADD COLUMN account_id TEXT");
     }
 
     /** One captured payment, as stored. */
@@ -92,6 +93,7 @@ public final class SpendStore extends SQLiteOpenHelper {
         public String entryIds;
         public long createdAt;
         public long closedAt;
+        public String accountId;
 
         SpendMerger.Fields fields() {
             SpendMerger.Fields f = new SpendMerger.Fields();
@@ -105,6 +107,7 @@ public final class SpendStore extends SQLiteOpenHelper {
             f.channel = channel;
             f.bank = bank;
             f.balancePaise = balancePaise;
+            f.accountId = accountId;
             f.sources = sources;
             return f;
         }
@@ -128,6 +131,12 @@ public final class SpendStore extends SQLiteOpenHelper {
      * marker when this exact message was already read (a re-scan, or the same notification posted twice).
      */
     public synchronized Captured capture(ParsedPayment p, String source, String sender, String text, long at, long now) {
+        return capture(p, source, sender, text, at, now, null);
+    }
+
+    /** {@link #capture} for a payment the user tied to one of their Gullak accounts (Scan & Pay, statement import). */
+    public synchronized Captured capture(ParsedPayment p, String source, String sender, String text, long at, long now,
+            String accountId) {
         SQLiteDatabase db = getWritableDatabase();
         String hash = sha1(source + "|" + (sender == null ? "" : sender.trim().toUpperCase(Locale.ROOT)) + "|" + PaymentParser.normalize(text));
         long window = SpendMerger.KIND_SMS.equals(source) ? SMS_SEEN_WINDOW_MS : APP_SEEN_WINDOW_MS;
@@ -145,6 +154,7 @@ public final class SpendStore extends SQLiteOpenHelper {
             List<SpendMerger.Fields> candidates = new ArrayList<>();
             for (Spend s : recent) candidates.add(s.fields());
             SpendMerger.Fields incoming = SpendMerger.Fields.of(p, at, source);
+            incoming.accountId = accountId;
             int index = SpendMerger.match(candidates, incoming);
 
             Spend result;
@@ -271,6 +281,7 @@ public final class SpendStore extends SQLiteOpenHelper {
         v.put("channel", f.channel);
         v.put("bank", f.bank);
         v.put("balance", f.balancePaise);
+        v.put("account_id", f.accountId);
         v.put("sources", f.sources);
         return v;
     }
@@ -331,6 +342,7 @@ public final class SpendStore extends SQLiteOpenHelper {
                 s.entryIds = c.isNull(16) ? null : c.getString(16);
                 s.createdAt = c.getLong(17);
                 s.closedAt = c.getLong(18);
+                s.accountId = c.isNull(19) ? null : c.getString(19);
                 out.add(s);
             }
         }

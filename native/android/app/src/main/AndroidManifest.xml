@@ -22,6 +22,10 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Long-press the icon: Scan & Pay. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <!-- "Share to Gullak" for payment messages the parser doesn't know yet. -->
@@ -54,7 +58,13 @@
             android:name=".capture.ReplyReceiver"
             android:exported="false" />
 
-        <!-- GPay, PhonePe and Paytm payment notifications (every other app is ignored). -->
+        <!-- The weekly balance check reminder (an inexact alarm, so no exact-alarm permission). -->
+        <receiver
+            android:name=".capture.BalanceReminder"
+            android:exported="false" />
+
+        <!-- Payment notifications from the payment and bank apps Gullak knows and the apps you add in Settings
+             (every other app is ignored). -->
         <service
             android:name=".capture.PaymentListener"
             android:exported="true"
@@ -64,6 +74,11 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Scan & Pay uses Google's code scanner, which runs in Google Play services: no camera permission. -->
+        <meta-data
+            android:name="com.google.mlkit.vision.DEPENDENCIES"
+            android:value="barcode_ui" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -75,6 +90,19 @@
                 android:resource="@xml/file_paths" />
         </provider>
     </application>
+
+    <queries>
+        <!-- Settings → Payment capture → Add app lists the apps on the phone. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- Scan & Pay hands each payment to a UPI app. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="upi" />
+        </intent>
+    </queries>
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />

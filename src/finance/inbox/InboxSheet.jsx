@@ -13,9 +13,9 @@ import {
   LuMessageSquareText,
   LuPencil,
   LuSendHorizontal,
+  LuFileSpreadsheet,
+  LuQrCode,
   LuSettings2,
-  LuShare2,
-  LuSmartphone,
   LuWandSparkles,
 } from 'react-icons/lu'
 import { useAgentConfig } from '../agent/agentConfig'
@@ -33,14 +33,7 @@ import { undoAlso } from '../lib/undo'
 import { useApp, useFinance, useUi } from '../store/contexts'
 import { findTwin, linkedEntryIds, matchAccount, pairTransfers, rupees, spendDate, suggest, toPrefill } from './enrich'
 import { merchantKey, payeeName, ruleFromEntry } from './rules'
-
-const SOURCES = {
-  sms: ['SMS', LuMessageSquareText],
-  gpay: ['GPay', LuSmartphone],
-  phonepe: ['PhonePe', LuSmartphone],
-  paytm: ['Paytm', LuSmartphone],
-  share: ['Shared', LuShare2],
-}
+import { sourceMeta } from './sources'
 
 const clock = (at) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 const nameOf = (spend) => payeeName(spend) || (spend.direction === 'in' ? 'Money in' : 'Payment')
@@ -161,10 +154,11 @@ function useFiling(onDone) {
 }
 
 function Sources({ list }) {
+  const apps = useApp()?.inbox?.status?.apps
   return (
     <span className="g-spend__sources">
       {list.map((source) => {
-        const [label, Icon] = SOURCES[source] || [source, LuSmartphone]
+        const [label, Icon] = sourceMeta(source, apps)
         return (
           <span key={source} className="g-spend__source">
             <Icon aria-hidden="true" /> {label}
@@ -176,7 +170,7 @@ function Sources({ list }) {
 }
 
 function Original({ spend }) {
-  const { getOriginal } = useApp().inbox
+  const { getOriginal, status } = useApp().inbox
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState(null)
 
@@ -198,7 +192,7 @@ function Original({ spend }) {
           {messages?.map((m, i) => (
             <figure key={`${m.at}-${i}`}>
               <figcaption>
-                {SOURCES[m.source]?.[0] || m.source}
+                {sourceMeta(m.source, status?.apps)[0]}
                 {m.sender && m.sender !== m.source ? ` · ${m.sender}` : ''} · {clock(m.at)}
               </figcaption>
               <blockquote>{m.text}</blockquote>
@@ -388,6 +382,7 @@ function PairCard({ pair, actions, onSkip }) {
 export default function InboxSheet({ focus = null, onDone }) {
   const inbox = useApp()?.inbox
   const { state } = useFinance()
+  const ui = useUi()
   const actions = useFiling(onDone)
   const [skipped, setSkipped] = useState([])
   const unfiled = inbox?.unfiled
@@ -460,6 +455,12 @@ export default function InboxSheet({ focus = null, onDone }) {
         </>
       )}
       <p className="g-inbox__foot">
+        <button type="button" className="g-link" onClick={() => ui.openSheet('scanpay')}>
+          <LuQrCode aria-hidden="true" /> Scan &amp; Pay
+        </button>
+        <button type="button" className="g-link" onClick={() => ui.openSheet('statement')}>
+          <LuFileSpreadsheet aria-hidden="true" /> Import a statement
+        </button>
         <button type="button" className="g-link" onClick={actions.settings}>
           <LuSettings2 aria-hidden="true" /> Payment capture settings
         </button>

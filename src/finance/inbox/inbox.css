@@ -471,6 +471,331 @@
   padding-block: 4px;
 }
 
+/* ---------- capture settings: apps, and what to do when nothing tells Gullak ---------- */
+.g-capture__picker {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface-2);
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r-sm);
+}
+
+.g-capture__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.g-capture__search > svg {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.g-capture__apps {
+  display: grid;
+  gap: 6px;
+  max-height: 22rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.g-capture__app {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.g-capture__app .g-capture__payee small {
+  display: block;
+  overflow: hidden;
+  font: 500 .72rem/1.3 var(--font-mono);
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+}
+
+.g-capture__more {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1.5px dashed var(--hair);
+}
+
+.g-capture__day {
+  width: auto;
+  min-height: 36px;
+  padding-block: 4px;
+}
+
+/* ---------- home: balance check note and the Scan & Pay button ---------- */
+.g-inbox-note--balance {
+  --tone: var(--mint);
+}
+
+.g-inbox-quick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.g-inbox-quick__hint {
+  font-size: .8rem;
+  color: var(--ink-3);
+}
+
+.g-inbox__foot {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+/* ---------- Scan & Pay ---------- */
+.g-scanpay {
+  gap: 14px;
+}
+
+.g-scanpay__payee {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.g-scanpay__badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  font-size: 1.3rem;
+  color: var(--on-tone);
+  background: var(--tone, var(--lime));
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r-sm);
+}
+
+.g-scanpay__who {
+  min-width: 0;
+}
+
+.g-scanpay__name {
+  overflow: hidden;
+  font: 800 1.1rem/1.25 var(--font-display);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-scanpay__vpa {
+  font: 500 .76rem/1.4 var(--font-mono);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+
+.g-scanpay__fixed {
+  font-size: .9rem;
+  color: var(--ink-2);
+}
+
+.g-scanpay__fixed strong {
+  font: 800 1.5rem/1.2 var(--font-display);
+  color: var(--ink);
+}
+
+.g-scanpay__wait,
+.g-scanpay__question,
+.g-scanpay__done {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font: 600 .95rem/1.45 var(--font-body);
+}
+
+.g-scanpay__wait > svg,
+.g-scanpay__done > svg {
+  flex: none;
+  margin-top: 2px;
+  font-size: 1.3rem;
+}
+
+.g-scanpay__done > svg {
+  color: var(--pos);
+}
+
+/* ---------- statement import ---------- */
+.g-statement {
+  gap: 14px;
+}
+
+.g-statement__file {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.g-statement__file .is-disabled {
+  opacity: .5;
+  pointer-events: none;
+}
+
+.g-statement__file input:focus-visible + .g-btn {
+  outline: 3px solid var(--tone, var(--lime));
+  outline-offset: 2px;
+}
+
+.g-statement__name {
+  overflow: hidden;
+  font: 500 .78rem/1.4 var(--font-mono);
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-statement__columns {
+  display: grid;
+  gap: 8px;
+  font-size: .86rem;
+}
+
+.g-statement__columns > summary {
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.g-statement__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 8px 12px;
+  margin: 8px 0;
+}
+
+.g-statement__column {
+  display: grid;
+  gap: 4px;
+  font: 600 .78rem/1.3 var(--font-body);
+  color: var(--ink-2);
+}
+
+.g-statement__column .g-select {
+  min-height: 36px;
+  padding-block: 4px;
+}
+
+.g-statement__summary {
+  font-size: .88rem;
+  color: var(--ink-2);
+}
+
+.g-statement__list {
+  display: grid;
+  gap: 4px;
+  max-height: 24rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.g-statement__line {
+  display: grid;
+  grid-template-columns: auto 4.2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: .86rem;
+  border: 1.5px solid var(--hair);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+
+.g-statement__line input {
+  accent-color: var(--ink);
+}
+
+.g-statement__line.is-off {
+  opacity: .45;
+}
+
+.g-statement__date {
+  font: 500 .76rem/1.3 var(--font-mono);
+  color: var(--ink-3);
+}
+
+.g-statement__what {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.g-statement__amount {
+  font: 700 .86rem/1.3 var(--font-mono);
+}
+
+.g-statement__amount.is-in {
+  color: var(--pos);
+}
+
+/* ---------- weekly balance check ---------- */
+.g-balance {
+  gap: 14px;
+}
+
+.g-balance__card {
+  --tone: var(--peach);
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--tone) 35%, var(--surface));
+  border: var(--bw) solid var(--frame);
+  border-radius: var(--r-sm);
+}
+
+.g-balance__card.is-square {
+  --tone: var(--mint);
+}
+
+.g-balance__rows {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.g-balance__rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: .88rem;
+}
+
+.g-balance__rows dt {
+  color: var(--ink-2);
+}
+
+.g-balance__rows dd {
+  margin: 0;
+  font: 700 .9rem/1.3 var(--font-mono);
+}
+
+.g-balance__verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font: 700 .92rem/1.4 var(--font-body);
+}
+
+.g-balance__verdict > svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.g-balance__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* ---------- Munshi: a payment attached to the next message ---------- */
 .g-mk-focus {
   display: flex;

@@ -1,6 +1,7 @@
 // Captured payments in the app: the list from the phone, permission status, and the actions that file,
 // dismiss and restore them. The phone's SQLite store stays the source of truth; this mirrors it and updates
-// optimistically so cards move the moment you tap.
+// optimistically so cards move the moment you tap. Also the phone's side of Scan & Pay, statement import, the
+// apps Gullak reads and the weekly balance check reminder.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { loadCapture } from './bridge'
 import { normalizeSpend } from './enrich'
@@ -16,6 +17,7 @@ export function useInboxState() {
   const [status, setStatus] = useState(null)
   const [spends, setSpends] = useState([])
   const [opening, setOpening] = useState(null)
+  const [intent, setIntent] = useState(null)
   const book = useSyncExternalStore(subscribeRules, readRules, readRules)
   const plugin = useRef(null)
   const current = useRef([])
@@ -46,6 +48,18 @@ export function useInboxState() {
     } catch (err) {
       warn(err)
       return null
+    }
+  }, [])
+
+  /** Like `call`, but keeps the phone's reason when it fails: `{ok: true, value}` or `{ok: false, error}`. */
+  const attempt = useCallback(async (method, args) => {
+    const target = plugin.current
+    if (!target || typeof target[method] !== 'function') return { ok: false, error: 'This needs the Gullak app on an Android phone.' }
+    try {
+      return { ok: true, value: await target[method](args) }
+    } catch (err) {
+      warn(err)
+      return { ok: false, error: String(err?.message || err || 'Something went wrong.') }
     }
   }, [])
 
@@ -80,6 +94,9 @@ export function useInboxState() {
     listen('openSpend', (data) => {
       if (data?.id) setOpening({ id: String(data.id), at: Date.now() })
     })
+    // The Scan & Pay shortcut and the weekly balance reminder open their screens.
+    listen('scanPay', () => setIntent({ kind: 'scanpay', at: Date.now() }))
+    listen('balanceCheck', () => setIntent({ kind: 'balance', at: Date.now() }))
     // Catch up on the SMS inbox now (queued: the list updates once the phone answers) and whenever Gullak
     // comes back to the foreground.
     const onBack = () => void scan()
@@ -153,6 +170,36 @@ export function useInboxState() {
   const openAppSettings = useCallback(() => call('openAppSettings'), [call])
   const getOriginal = useCallback(async (id) => (await call('getOriginal', { id }))?.messages || [], [call])
   const clearOpening = useCallback(() => setOpening(null), [])
+  const clearIntent = useCallback(() => setIntent(null), [])
+
+  // Which apps are read: Settings → Payment capture lists the phone's apps and adds or removes them.
+  const listApps = useCallback(async () => (await call('listApps'))?.apps || [], [call])
+  const addApp = useCallback((pkg, label) => withStatus('addApp', { package: pkg, label }), [withStatus])
+  const removeApp = useCallback((pkg) => withStatus('removeApp', { package: pkg }), [withStatus])
+
+  // Scan & Pay: scan, hand the payment to a UPI app, then record it.
+  const scanQr = useCallback(() => attempt('scanQr'), [attempt])
+  const listUpiApps = useCallback(async () => (await call('listUpiApps'))?.apps || [], [call])
+  const payUpi = useCallback((uri, pkg) => attempt('payUpi', { uri, package: pkg || null }), [attempt])
+  const recordPayment = useCallback(
+    async (payment) => {
+      const result = await attempt('recordPayment', payment)
+      await refresh()
+      return result
+    },
+    [attempt, refresh],
+  )
+
+  /** Stores checked statement lines as unfiled spends: `{ok, value: {added, merged, duplicates}}`. */
+  const importSpends = useCallback(
+    async (rows) => {
+      const result = await attempt('importSpends', { rows })
+      await refresh()
+      return result
+    },
+    [attempt, refresh],
+  )
+  const setBalanceReminder = useCallback((options) => call('setBalanceReminder', options), [call])
 
   const unfiled = useMemo(() => spends.filter((s) => s.status === 'unfiled').sort((a, b) => b.at - a.at), [spends])
 
@@ -167,6 +214,8 @@ export function useInboxState() {
       book,
       opening,
       clearOpening,
+      intent,
+      clearIntent,
       refresh,
       scan,
       requestSms,
@@ -183,6 +232,15 @@ export function useInboxState() {
       setRule,
       setAlias,
       find,
+      listApps,
+      addApp,
+      removeApp,
+      scanQr,
+      listUpiApps,
+      payUpi,
+      recordPayment,
+      importSpends,
+      setBalanceReminder,
     }),
     [
       capture,
@@ -192,6 +250,8 @@ export function useInboxState() {
       book,
       opening,
       clearOpening,
+      intent,
+      clearIntent,
       refresh,
       scan,
       requestSms,
@@ -208,6 +268,15 @@ export function useInboxState() {
       setRule,
       setAlias,
       find,
+      listApps,
+      addApp,
+      removeApp,
+      scanQr,
+      listUpiApps,
+      payUpi,
+      recordPayment,
+      importSpends,
+      setBalanceReminder,
     ],
   )
 }

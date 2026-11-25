@@ -1,11 +1,16 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import {
   LuBell,
   LuCircleCheck,
+  LuFileSpreadsheet,
   LuInfo,
   LuMessageSquareText,
   LuPause,
+  LuPlus,
+  LuQrCode,
   LuRefreshCw,
+  LuScale,
+  LuSearch,
   LuShieldAlert,
   LuSmartphone,
   LuTrash2,
@@ -15,13 +20,10 @@ import { categoryMeta, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../lib/cate
 import { cx } from '../lib/cx'
 import { plural } from '../lib/format'
 import { useApp, useFinance, useUi } from '../store/contexts'
+import { checkable, readChecks, REMINDER_HOUR, subscribeChecks, updateChecks } from './balance'
 
-const SOURCE_ROWS = [
-  ['sms', 'Bank SMS', 'Debits and credits your banks text you'],
-  ['gpay', 'Google Pay', 'Payment notifications from GPay'],
-  ['phonepe', 'PhonePe', 'Payment notifications from PhonePe'],
-  ['paytm', 'Paytm', 'Payment notifications from Paytm'],
-]
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const PICKER_SHOWN = 60
 
 const LOOKBACK = [
   { value: '0', label: 'None' },
@@ -55,6 +57,156 @@ function Step({ done, icon: Icon, title, body, children }) {
   )
 }
 
+/**
+ * Settings → Payment capture → Add app: the apps on this phone (those that send notifications first), to read
+ * payment alerts from one Gullak doesn't know out of the box.
+ */
+function AddApp({ inbox, ui }) {
+  const [apps, setApps] = useState(null)
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+
+  const show = async () => {
+    setOpen(true)
+    setApps(await inbox.listApps())
+  }
+
+  const add = async (app) => {
+    await inbox.addApp(app.package, app.label)
+    setApps((list) => list.map((a) => (a.package === app.package ? { ...a, read: true } : a)))
+    ui.toast(`Gullak now reads ${app.label}’s payment alerts`, { tone: 'lime' })
+  }
+
+  if (!open) {
+    return (
+      <div className="g-settings__actions">
+        <button type="button" className="g-btn g-btn--sm g-press" onClick={show}>
+          <LuPlus aria-hidden="true" /> Add another app
+        </button>
+      </div>
+    )
+  }
+
+  const words = query.trim().toLowerCase()
+  const listed = (apps || [])
+    .filter((a) => !a.read && (!words || a.label.toLowerCase().includes(words) || a.package.toLowerCase().includes(words)))
+    .sort((a, b) => b.lastSeen - a.lastSeen || a.label.localeCompare(b.label))
+
+  return (
+    <div className="g-capture__picker">
+      <label className="g-capture__search">
+        <LuSearch aria-hidden="true" />
+        <input
+          className="g-input"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search your apps"
+          aria-label="Search your apps"
+          autoComplete="off"
+        />
+      </label>
+      {apps === null && <p className="g-settings__note">Looking at your apps…</p>}
+      {apps !== null && listed.length === 0 && <p className="g-settings__note">No other apps match.</p>}
+      <ul className="g-capture__apps">
+        {listed.slice(0, PICKER_SHOWN).map((app) => (
+          <li key={app.package} className="g-capture__app">
+            <span className="g-capture__payee">
+              {app.label}
+              <small>{app.lastSeen > 0 ? 'Sends you notifications' : app.package}</small>
+            </span>
+            <button type="button" className="g-btn g-btn--sm g-press" onClick={() => add(app)}>
+              <LuPlus aria-hidden="true" /> Add
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="g-settings__fine">
+        <LuInfo aria-hidden="true" /> Add the apps that tell you about payments: your bank’s app, a wallet, another UPI app.
+        Gullak reads only the notifications that look like a payment, and only from the apps you add.
+      </p>
+      <button type="button" className="g-link" onClick={() => setOpen(false)}>
+        Done adding apps
+      </button>
+    </div>
+  )
+}
+
+/** Settings → Payment capture → Weekly balance check: on or off, which day, and which accounts. */
+function BalanceCheckSettings({ inbox, ui, accounts }) {
+  const checks = useSyncExternalStore(subscribeChecks, readChecks, readChecks)
+  const candidates = checkable(accounts)
+
+  const remind = (next) => inbox.setBalanceReminder({ enabled: next.enabled && next.accounts.length > 0, weekday: next.weekday, hour: REMINDER_HOUR })
+
+  const change = (patch) => {
+    const next = updateChecks((current) => ({ ...current, ...patch }))
+    void remind(next)
+    return next
+  }
+
+  const toggleOn = () => {
+    const turningOn = !checks.enabled
+    const chosen = checks.accounts.filter((id) => candidates.some((a) => a.id === id))
+    change({ enabled: turningOn, accounts: turningOn && chosen.length === 0 ? candidates.map((a) => a.id) : chosen })
+    if (turningOn) ui.toast(`Gullak will ask every ${WEEKDAYS[checks.weekday]} evening`, { tone: 'lime' })
+  }
+
+  const toggleAccount = (id) =>
+    change({ accounts: checks.accounts.includes(id) ? checks.accounts.filter((a) => a !== id) : [...checks.accounts, id] })
+
+  return (
+    <div className="g-capture__more">
+      <div className="g-settings__row">
+        <span className="g-settings__label">
+          <span>
+            <LuScale aria-hidden="true" /> Weekly balance check
+          </span>
+          <small>Once a week Gullak asks what your bank shows and finds the payments it never heard about.</small>
+        </span>
+        <Switch on={checks.enabled} label="Weekly balance check" onToggle={toggleOn} disabled={candidates.length === 0} />
+      </div>
+      {candidates.length === 0 && <p className="g-settings__note">Add your bank accounts in Accounts to check them here.</p>}
+      {checks.enabled && candidates.length > 0 && (
+        <>
+          <div className="g-settings__row">
+            <span className="g-settings__label">
+              Ask me on
+              <small>In the evening, as a notification.</small>
+            </span>
+            <select
+              className="g-input g-select g-capture__day"
+              aria-label="Day of the week"
+              value={checks.weekday}
+              onChange={(event) => change({ weekday: Number(event.target.value) })}
+            >
+              {WEEKDAYS.map((day, index) => (
+                <option key={day} value={index}>
+                  {day}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="g-chips" role="group" aria-label="Accounts to check">
+            {candidates.map((account) => {
+              const on = checks.accounts.includes(account.id)
+              return (
+                <button key={account.id} type="button" className={cx('g-chip', on && 'is-active')} aria-pressed={on} onClick={() => toggleAccount(account.id)}>
+                  {account.name}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
+      <div className="g-settings__actions">
+        <button type="button" className="g-btn g-btn--sm g-press" onClick={() => ui.openSheet('balance')} disabled={candidates.length === 0}>
+          <LuScale aria-hidden="true" /> Check a balance now
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /** Settings → Payment capture (Android app): what Gullak may read, how far back, and what it has learned. */
 export default function CaptureSettings() {
   const inbox = useApp()?.inbox
@@ -78,6 +230,14 @@ export default function CaptureSettings() {
   const smsRefused = status.sms === 'denied'
   const notifyOn = status.notifications === 'granted'
   const restricted = status.sdk >= 33 && (!smsOn || !status.listener)
+  const apps = Array.isArray(status.apps) ? status.apps : []
+  const sourceRows = [
+    { id: 'sms', label: 'Bank SMS', hint: 'Debits and credits your banks text you' },
+    ...apps
+      .filter((a) => !a.builtIn || a.installed)
+      .map((a) => ({ id: a.id, label: a.label, hint: a.builtIn ? `Payment notifications from ${a.label}` : 'Added by you', removable: !a.builtIn })),
+  ]
+  const notInstalled = apps.filter((a) => a.builtIn && !a.installed)
 
   const scanFrom = async (value) => {
     setScanning(true)
@@ -117,8 +277,8 @@ export default function CaptureSettings() {
         <Step
           done={status.listener}
           icon={LuSmartphone}
-          title="Read GPay, PhonePe and Paytm alerts"
-          body="Notification access. Gullak ignores every other app."
+          title="Read payment app alerts"
+          body="Notification access. Gullak reads only the apps switched on below and ignores every other app."
         >
           <button type="button" className="g-btn g-btn--sm g-btn--ink g-press" onClick={inbox.openListenerSettings}>
             Turn on
@@ -155,12 +315,25 @@ export default function CaptureSettings() {
       )}
 
       <div className="g-capture__sources" role="group" aria-label="What to read">
-        {SOURCE_ROWS.map(([id, label, hint]) => (
+        {sourceRows.map(({ id, label, hint, removable }) => (
           <div key={id} className="g-settings__row">
             <span className="g-settings__label">
               {label}
               <small>{hint}</small>
             </span>
+            {removable && (
+              <button
+                type="button"
+                className="g-icon-btn g-press"
+                aria-label={`Stop reading ${label}`}
+                onClick={() => {
+                  void inbox.removeApp(id)
+                  ui.toast(`Gullak no longer reads ${label}`, { tone: 'gray' })
+                }}
+              >
+                <LuTrash2 aria-hidden="true" />
+              </button>
+            )}
             <Switch
               on={status.sources?.[id] !== false}
               label={label}
@@ -169,6 +342,11 @@ export default function CaptureSettings() {
             />
           </div>
         ))}
+        {notInstalled.length > 0 && (
+          <p className="g-settings__note">
+            Also read when installed: {notInstalled.map((a) => a.label).join(', ')}.
+          </p>
+        )}
         <div className="g-settings__row">
           <span className="g-settings__label">
             <span>
@@ -179,6 +357,30 @@ export default function CaptureSettings() {
           <Switch on={Boolean(status.paused)} label="Pause capture" onToggle={() => inbox.setPrefs({ paused: !status.paused })} />
         </div>
       </div>
+
+      <AddApp inbox={inbox} ui={ui} />
+
+      <div className="g-capture__more">
+        <h3 className="g-capture__title">When nothing tells Gullak</h3>
+        <p className="g-settings__note">
+          Some accounts send no SMS and their app sends no alert. For those, pay with Scan &amp; Pay, import the bank’s
+          statement, or let the weekly balance check find what’s missing.
+        </p>
+        <div className="g-settings__actions">
+          <button type="button" className="g-btn g-btn--sm g-btn--ink g-press" onClick={() => ui.openSheet('scanpay')}>
+            <LuQrCode aria-hidden="true" /> Scan &amp; Pay
+          </button>
+          <button type="button" className="g-btn g-btn--sm g-press" onClick={() => ui.openSheet('statement')}>
+            <LuFileSpreadsheet aria-hidden="true" /> Import a statement
+          </button>
+        </div>
+        <p className="g-settings__fine">
+          <LuInfo aria-hidden="true" /> Scan &amp; Pay scans a UPI QR, opens your UPI app with the amount filled in, and records the
+          payment when you come back. Long-press the Gullak icon for a shortcut.
+        </p>
+      </div>
+
+      <BalanceCheckSettings inbox={inbox} ui={ui} accounts={state.accounts} />
 
       {smsOn && status.lookbackSet && (
         <div className="g-settings__actions">
@@ -246,7 +448,8 @@ export default function CaptureSettings() {
 
       <p className="g-settings__fine">
         <LuInfo aria-hidden="true" /> Message text stays on this phone and is deleted once a payment is filed. Munshi only sees
-        the amount, payee, account and your notes. Rules live on this phone only.
+        the amount, payee, account and your notes. Rules, statement lines and balance checks live on this phone only. To
+        list apps under Add app, Gullak notes which apps post notifications, never what they say.
         {status.lastScanAt > 0 && ` Last checked ${new Date(status.lastScanAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}.`}
         {inbox.mock && ' (Browser preview with sample payments.)'}
       </p>

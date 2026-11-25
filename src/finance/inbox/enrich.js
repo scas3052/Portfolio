@@ -46,10 +46,15 @@ export function sameBank(hint, bank) {
 }
 
 /**
- * The account a payment went through: a remembered alias for its digits first, then the one account ending
- * in those digits, then (cards without digits) the one card of that bank. `{account, how}` or `{account: null}`.
+ * The account a payment went through: the account picked for it in Gullak (Scan & Pay, a statement import), then
+ * a remembered alias for its digits, then the one account ending in those digits, then (cards without digits)
+ * the one card of that bank. `{account, how}` or `{account: null}`.
  */
 export function matchAccount(spend, accounts, aliases = {}) {
+  if (spend.accountId) {
+    const chosen = accounts.find((a) => a.id === spend.accountId)
+    if (chosen) return { account: chosen, how: 'chosen' }
+  }
   const digits = spend.account ? String(spend.account) : ''
   if (digits && aliases[digits]) {
     const account = accounts.find((a) => a.id === aliases[digits])
@@ -183,6 +188,7 @@ export function normalizeSpend(raw) {
     balance: Number.isFinite(raw.balancePaise) ? raw.balancePaise / 100 : null,
     sources: Array.isArray(raw.sources) ? raw.sources.filter((s) => typeof s === 'string') : [],
     hasOriginal: Boolean(raw.hasOriginal),
+    accountId: text(raw.accountId),
     hint: text(raw.hint),
     hintAt: Number(raw.hintAt) || 0,
     entryIds: Array.isArray(raw.entryIds) ? raw.entryIds.filter((s) => typeof s === 'string' && s) : [],
