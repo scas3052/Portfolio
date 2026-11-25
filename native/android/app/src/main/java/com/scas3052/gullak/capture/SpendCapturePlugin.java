@@ -418,8 +418,9 @@ public class SpendCapturePlugin extends Plugin {
      */
     @PluginMethod
     public void recordPayment(PluginCall call) {
-        Long paise = call.getLong("amountPaise");
-        if (paise == null || paise <= 0 || paise >= 10_000_000_000L) {
+        // PluginCall.getLong() returns null for a JSON number that parsed as an Integer, i.e. any amount under ~₹2.1 crore.
+        long paise = call.getData().optLong("amountPaise", 0);
+        if (paise <= 0 || paise >= 10_000_000_000L) {
             call.reject("amountPaise is required");
             return;
         }
