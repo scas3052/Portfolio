@@ -10,9 +10,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Build;
-import android.os.Bundle;
 import android.provider.Settings;
-import androidx.activity.result.ActivityResult;
 import androidx.core.app.NotificationManagerCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -20,15 +18,9 @@ import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
-import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
-import com.google.mlkit.vision.barcode.common.Barcode;
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanner;
-import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions;
-import com.google.mlkit.vision.codescanner.GmsBarcodeScanning;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -39,12 +31,11 @@ import org.json.JSONObject;
 
 /**
  * The bridge between captured payments and Gullak's web code (src/finance/inbox/bridge.js): permission status
- * and requests, which apps are read, the inbox catch-up scan, the list of spends, and filing, dismissing and
- * restoring them; plus Scan & Pay (QR scan, hand-off to a UPI app, recording the payment), statement import and
- * the weekly balance check reminder.
+ * and requests, which apps and bank email senders are read, the inbox catch-up scan, the list of spends, and filing,
+ * dismissing and restoring them; plus statement import and the weekly balance check reminder.
  *
- * <p>Events: {@code changed} whenever the list changes, {@code openSpend} ({id}) when a payment notification or a
- * share opens Gullak, {@code scanPay} from the Scan & Pay shortcut, and {@code balanceCheck} from the reminder.
+ * <p>Events: {@code changed} whenever the list changes (or an email from a listed sender arrives), {@code openSpend}
+ * ({id}) when a payment notification or a share opens Gullak, and {@code balanceCheck} from the reminder.
  */
 @CapacitorPlugin(
         name = "SpendCapture",
@@ -54,9 +45,6 @@ import org.json.JSONObject;
         })
 public class SpendCapturePlugin extends Plugin {
 
-    static final String ACTION_SCAN_PAY = "com.scas3052.gullak.SCAN_PAY";
-    private static final Set<String> UPI_ANSWER_KEYS =
-            new HashSet<>(Arrays.asList("status", "txnid", "txnref", "approvalrefno", "responsecode"));
     private static final int MAX_IMPORT_ROWS = 2000;
 
     private static volatile SpendCapturePlugin live;
@@ -89,16 +77,15 @@ public class SpendCapturePlugin extends Plugin {
     }
 
     /**
-     * A notification tap or a share names a spend; the Scan & Pay shortcut and the balance reminder open their
-     * screens. Each event waits until the web code listens, and is handled once.
+     * A notification tap or a share names a spend; the balance reminder opens the balance check. Each event waits
+     * until the web code listens, and is handled once.
      */
     private void noteIntent(Intent intent) {
         if (intent == null) return;
-        String action = intent.getAction();
-        if (ACTION_SCAN_PAY.equals(action) || BalanceReminder.ACTION_OPEN.equals(action)) {
+        if (BalanceReminder.ACTION_OPEN.equals(intent.getAction())) {
             intent.setAction(Intent.ACTION_MAIN);
-            if (BalanceReminder.ACTION_OPEN.equals(action)) BalanceReminder.cancel(getContext());
-            notifyListeners(ACTION_SCAN_PAY.equals(action) ? "scanPay" : "balanceCheck", new JSObject(), true);
+            BalanceReminder.cancel(getContext());
+            notifyListeners("balanceCheck", new JSObject(), true);
             return;
         }
         String id = intent.getStringExtra(SpendNotifier.EXTRA_SPEND_ID);
@@ -129,6 +116,7 @@ public class SpendCapturePlugin extends Plugin {
         for (String source : Capture.sourceIds(context)) sources.put(source, Capture.sourceOn(context, source));
         status.put("sources", sources);
         status.put("apps", appsStatus(context));
+        status.put("mail", mailStatus(context));
         status.put("lookbackSet", prefs.getBoolean(Capture.PREF_LOOKBACK_SET, false));
         status.put("lastScanAt", prefs.getLong(Capture.PREF_LAST_SCAN, 0));
         status.put("sdk", Build.VERSION.SDK_INT);
@@ -245,6 +233,56 @@ public class SpendCapturePlugin extends Plugin {
         return app;
     }
 
+    /** The bank email senders read, the mail apps on this phone, and the last email from a listed sender. */
+    private static JSObject mailStatus(Context context) {
+        PackageManager pm = context.getPackageManager();
+        JSObject mail = new JSObject();
+        JSArray senders = new JSArray();
+        for (String sender : Capture.mailSenders(context)) senders.put(sender);
+        mail.put("senders", senders);
+        JSArray apps = new JSArray();
+        for (PaymentApps.App app : PaymentApps.MAIL) {
+            if (installed(pm, app.packageName)) apps.put(app.label);
+        }
+        mail.put("apps", apps);
+        JSONObject last = Capture.lastMail(context);
+        if (last != null) {
+            JSObject seen = new JSObject();
+            seen.put("sender", last.optString("sender", ""));
+            seen.put("at", last.optLong("at", 0));
+            seen.put("payment", last.optBoolean("payment", false));
+            mail.put("last", seen);
+        }
+        return mail;
+    }
+
+    /** Starts reading payment emails from a sender ({name}, as the mail app's notification shows it). */
+    @PluginMethod
+    public void addMailSender(PluginCall call) {
+        String name = MailSenders.clean(call.getString("name"));
+        if (name == null) {
+            call.reject("Type the sender's name as your mail app shows it");
+            return;
+        }
+        if (!Capture.addMailSender(getContext(), name)) {
+            call.reject("That's " + MailSenders.MAX_SENDERS + " senders already. Remove one first.");
+            return;
+        }
+        call.resolve(status());
+    }
+
+    /** Stops reading emails from a sender ({name}). Payments already caught from it stay. */
+    @PluginMethod
+    public void removeMailSender(PluginCall call) {
+        String name = call.getString("name");
+        if (name == null) {
+            call.reject("name is required");
+            return;
+        }
+        Capture.removeMailSender(getContext(), name);
+        call.resolve(status());
+    }
+
     /** The apps on this phone (name and package only), for Settings → Add app; the ones that notify come first. */
     @PluginMethod
     public void listApps(PluginCall call) {
@@ -258,7 +296,8 @@ public class SpendCapturePlugin extends Plugin {
             JSArray apps = new JSArray();
             for (ResolveInfo info : pm.queryIntentActivities(launcher, 0)) {
                 String pkg = info.activityInfo.packageName;
-                if (pkg.equals(context.getPackageName()) || !listed.add(pkg)) continue;
+                // Mail apps are read for the bank senders in Settings → Bank emails, never as payment apps.
+                if (pkg.equals(context.getPackageName()) || PaymentApps.isMail(pkg) || !listed.add(pkg)) continue;
                 JSObject app = new JSObject();
                 app.put("package", pkg);
                 app.put("label", String.valueOf(info.loadLabel(pm)));
@@ -295,96 +334,7 @@ public class SpendCapturePlugin extends Plugin {
         call.resolve(status());
     }
 
-    // ---- Scan & Pay -------------------------------------------------------------------------------
-
-    /** Opens Google's code scanner (it runs in Google Play services, so Gullak needs no camera permission). */
-    @PluginMethod
-    public void scanQr(PluginCall call) {
-        Activity activity = getActivity();
-        if (activity == null) {
-            call.reject("Gullak isn't open");
-            return;
-        }
-        GmsBarcodeScannerOptions options = new GmsBarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .enableAutoZoom()
-                .build();
-        GmsBarcodeScanner scanner = GmsBarcodeScanning.getClient(activity, options);
-        scanner.startScan()
-                .addOnSuccessListener(barcode -> {
-                    JSObject result = new JSObject();
-                    result.put("value", barcode.getRawValue());
-                    call.resolve(result);
-                })
-                .addOnCanceledListener(() -> {
-                    JSObject result = new JSObject();
-                    result.put("cancelled", true);
-                    call.resolve(result);
-                })
-                .addOnFailureListener(error -> call.reject(
-                        "The scanner didn't open. The first time, Google Play services may still be setting it up: try again in a minute."));
-    }
-
-    /** UPI apps on this phone that can take a payment link, for the "Pay with" choice. */
-    @PluginMethod
-    public void listUpiApps(PluginCall call) {
-        PackageManager pm = getContext().getPackageManager();
-        Intent upi = new Intent(Intent.ACTION_VIEW, Uri.parse("upi://pay"));
-        Set<String> listed = new HashSet<>();
-        JSArray apps = new JSArray();
-        for (ResolveInfo info : pm.queryIntentActivities(upi, 0)) {
-            String pkg = info.activityInfo.packageName;
-            if (!listed.add(pkg)) continue;
-            JSObject app = new JSObject();
-            app.put("package", pkg);
-            app.put("label", String.valueOf(info.loadLabel(pm)));
-            apps.put(app);
-        }
-        JSObject result = new JSObject();
-        result.put("apps", apps);
-        call.resolve(result);
-    }
-
-    /** Hands a {@code upi://pay} link to a UPI app; resolves with what that app reports when it comes back. */
-    @PluginMethod
-    public void payUpi(PluginCall call) {
-        String uri = call.getString("uri");
-        if (uri == null || !uri.toLowerCase(Locale.ROOT).startsWith("upi://pay")) {
-            call.reject("That isn't a UPI payment link");
-            return;
-        }
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(uri));
-        String pkg = call.getString("package");
-        if (pkg != null && !pkg.isEmpty()) intent.setPackage(pkg);
-        if (intent.resolveActivity(getContext().getPackageManager()) == null) {
-            call.reject("No UPI app on this phone can take this payment");
-            return;
-        }
-        startActivityForResult(call, intent, "afterPayment");
-    }
-
-    @ActivityCallback
-    private void afterPayment(PluginCall call, ActivityResult result) {
-        if (call == null) return;
-        JSObject answer = new JSObject();
-        answer.put("resultCode", result.getResultCode());
-        JSObject extras = new JSObject();
-        Intent data = result.getData();
-        if (data != null) {
-            String response = data.getStringExtra("response");
-            if (response != null) answer.put("response", response);
-            Bundle bundle = data.getExtras();
-            if (bundle != null) {
-                for (String key : bundle.keySet()) {
-                    if (!UPI_ANSWER_KEYS.contains(key.toLowerCase(Locale.ROOT))) continue;
-                    Object value = bundle.get(key);
-                    if (value != null) extras.put(key, String.valueOf(value));
-                }
-            }
-        }
-        answer.put("extras", extras);
-        call.resolve(answer);
-    }
+    // ---- statement import -------------------------------------------------------------------------
 
     private static String clean(String value, int max) {
         if (value == null) return null;
@@ -411,49 +361,6 @@ public class SpendCapturePlugin extends Plugin {
         String value = row.optString(key, "").trim();
         return value.isEmpty() ? null : value;
     }
-
-    /**
-     * Records a payment made with Scan & Pay as an unfiled spend on the account the user picked, with their note.
-     * The payment's own app alert or bank SMS merges into it when it arrives. Resolves with the spend's id.
-     */
-    @PluginMethod
-    public void recordPayment(PluginCall call) {
-        // PluginCall.getLong() returns null for a JSON number that parsed as an Integer, i.e. any amount under ~₹2.1 crore.
-        long paise = call.getData().optLong("amountPaise", 0);
-        if (paise <= 0 || paise >= 10_000_000_000L) {
-            call.reject("amountPaise is required");
-            return;
-        }
-        String party = clean(call.getString("party"), 60);
-        String vpa = clean(call.getString("vpa"), 80);
-        String ref = rrn(call.getString("ref"));
-        String app = clean(call.getString("app"), 40);
-        String note = call.getString("note");
-        String accountId = clean(call.getString("accountId"), 64);
-        ParsedPayment parsed = new ParsedPayment(paise, ParsedPayment.OUT, digits(call.getString("account")), party,
-                vpa != null ? vpa.toLowerCase(Locale.ROOT) : null, ref, "upi", clean(call.getString("bank"), 40), -1);
-        String who = party != null ? party : vpa != null ? vpa : "a UPI payee";
-        String text = "Paid " + PaymentParser.formatRupees(paise) + " to " + who
-                + (vpa != null && party != null ? " (" + vpa + ")" : "")
-                + (app != null ? " with " + app : "")
-                + (ref != null ? ". Ref " + ref : "");
-        long at = System.currentTimeMillis();
-        Context context = getContext();
-        Capture.run(() -> {
-            SpendStore.Captured captured = Capture.onDirect(context, parsed, Capture.SOURCE_SCANPAY, "Scan & Pay", text, at, accountId);
-            String id = captured != null && captured.spend != null ? captured.spend.id : null;
-            if (id != null && note != null && !note.trim().isEmpty()) {
-                SpendStore.get(context).setHint(id, note, System.currentTimeMillis());
-                changed();
-            }
-            JSObject result = new JSObject();
-            result.put("id", id);
-            result.put("duplicate", captured != null && captured.duplicate);
-            call.resolve(result);
-        });
-    }
-
-    // ---- statement import -------------------------------------------------------------------------
 
     /**
      * Stores bank statement lines the web code has already checked against the book: each becomes an unfiled spend

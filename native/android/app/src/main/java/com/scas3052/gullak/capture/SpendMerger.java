@@ -9,23 +9,26 @@ import java.util.Set;
  * Decides when two messages describe one payment, and what the merged spend keeps. Plain Java, unit-tested.
  *
  * <p>A message joins an existing spend when both carry the same reference number, or when messages from different
- * places (an SMS, an app notification, a shared text, a Scan &amp; Pay, a statement line) agree on amount and
- * direction within {@link #WINDOW_MS}. Two alerts from different apps can be one payment too (Google Pay and the
- * bank's own app both report it), as long as they don't name different accounts or payees. Two messages from the
+ * places (an SMS, an app notification, a bank email, a shared text, a statement line) agree on amount and direction
+ * within {@link #WINDOW_MS} ({@link #MAIL_WINDOW_MS} with an email, which can arrive later). Two alerts from different
+ * apps can be one payment too (Google Pay and the bank's own app both report it), as long as they don't name
+ * different accounts or payees; an email never joins a payment on another account or bank. Two messages from the
  * same place never merge without a shared reference: two ₹20 teas from the same bank are two teas.
  */
 public final class SpendMerger {
 
     /** How far apart an SMS and an app notification for the same payment can arrive. */
     public static final long WINDOW_MS = 15 * 60 * 1000L;
+    /** Bank emails can come a while after the SMS or app alert for the same payment. */
+    public static final long MAIL_WINDOW_MS = 2 * 60 * 60 * 1000L;
     /** Statement lines carry a date, not a time (they're stored at noon), so they match that day's alerts. */
     public static final long STATEMENT_WINDOW_MS = 36 * 60 * 60 * 1000L;
 
     public static final String KIND_SMS = "sms";
     public static final String KIND_APP = "app";
     public static final String KIND_SHARE = "share";
-    /** A payment made with Scan &amp; Pay in Gullak (source "scanpay"). */
-    public static final String KIND_PAY = "pay";
+    /** A bank email, read from the mail app's notification (source "mail"). */
+    public static final String KIND_MAIL = "mail";
     /** A line imported from a bank statement (source "statement"). */
     public static final String KIND_STATEMENT = "statement";
 
@@ -43,7 +46,7 @@ public final class SpendMerger {
         public String channel;
         public String bank;
         public long balancePaise = -1;
-        /** The Gullak account the user picked for it (Scan &amp; Pay, statement import), or null. */
+        /** The Gullak account the user picked for it (statement import), or null. */
         public String accountId;
         /** Comma-separated source names, e.g. "sms,gpay". */
         public String sources = "";
@@ -65,11 +68,11 @@ public final class SpendMerger {
         }
     }
 
-    /** sms, app, share, pay or statement, for a source name such as "sms", "gpay", "share", "scanpay" or "statement". */
+    /** sms, app, share, mail or statement, for a source name such as "sms", "gpay", "share", "mail" or "statement". */
     public static String kindOf(String source) {
         if (KIND_SMS.equals(source)) return KIND_SMS;
         if (KIND_SHARE.equals(source)) return KIND_SHARE;
-        if ("scanpay".equals(source)) return KIND_PAY;
+        if (KIND_MAIL.equals(source)) return KIND_MAIL;
         if (KIND_STATEMENT.equals(source)) return KIND_STATEMENT;
         return KIND_APP;
     }
@@ -84,7 +87,7 @@ public final class SpendMerger {
 
     /**
      * True when {@code sources} already has a message from the same place as {@code source}, so a second one is a
-     * second payment: the same app, or for SMS, shares, Scan &amp; Pay and statements, the same kind.
+     * second payment: the same app, or for SMS, shares, emails and statements, the same kind.
      */
     static boolean samePlace(String sources, String source) {
         if (sources == null || sources.isEmpty()) return false;
@@ -119,13 +122,21 @@ public final class SpendMerger {
     }
 
     /**
-     * False when the details rule out one payment: different accounts picked in Gullak, or two app alerts naming
-     * different account digits or payees with no word in common. Merging two real payments would lose one, so
-     * between two apps Gullak only merges what agrees.
+     * False when the details rule out one payment: different accounts picked in Gullak, an email and another alert
+     * naming different account digits or banks, or two app alerts naming different account digits or payees with no
+     * word in common. Merging two real payments would lose one, so Gullak only merges what agrees.
      */
     static boolean compatible(Fields existing, Fields incoming) {
         if (existing.accountId != null && incoming.accountId != null && !existing.accountId.equals(incoming.accountId)) {
             return false;
+        }
+        if (KIND_MAIL.equals(kindOf(incoming.sources)) || hasKind(existing.sources, KIND_MAIL)) {
+            if (existing.account != null && incoming.account != null && !sameDigits(existing.account, incoming.account)) {
+                return false;
+            }
+            if (existing.bank != null && incoming.bank != null && !existing.bank.equalsIgnoreCase(incoming.bank)) {
+                return false;
+            }
         }
         if (!KIND_APP.equals(kindOf(incoming.sources)) || !hasKind(existing.sources, KIND_APP)) return true;
         if (existing.account != null && incoming.account != null && !sameDigits(existing.account, incoming.account)) {
@@ -140,6 +151,7 @@ public final class SpendMerger {
      */
     public static int match(List<Fields> recent, Fields incoming) {
         boolean statement = KIND_STATEMENT.equals(kindOf(incoming.sources));
+        boolean mail = KIND_MAIL.equals(kindOf(incoming.sources));
         int best = -1;
         long bestGap = Long.MAX_VALUE;
         for (int i = 0; i < recent.size(); i++) {
@@ -149,7 +161,8 @@ public final class SpendMerger {
             if (bothRefs && c.ref.toLowerCase(Locale.ROOT).equals(incoming.ref.toLowerCase(Locale.ROOT))) return i;
             if (bothRefs) continue;
             long gap = Math.abs(c.at - incoming.at);
-            long window = statement || hasKind(c.sources, KIND_STATEMENT) ? STATEMENT_WINDOW_MS : WINDOW_MS;
+            long window = statement || hasKind(c.sources, KIND_STATEMENT) ? STATEMENT_WINDOW_MS
+                    : mail || hasKind(c.sources, KIND_MAIL) ? MAIL_WINDOW_MS : WINDOW_MS;
             if (gap > window || samePlace(c.sources, incoming.sources) || !compatible(c, incoming)) continue;
             if (gap < bestGap) {
                 best = i;

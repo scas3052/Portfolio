@@ -5,7 +5,6 @@ import BalanceSheet from '../inbox/BalanceSheet'
 import CaptureSettings from '../inbox/CaptureSettings'
 import InboxBanner from '../inbox/InboxBanner'
 import InboxSheet from '../inbox/InboxSheet'
-import ScanPaySheet from '../inbox/ScanPaySheet'
 import StatementSheet from '../inbox/StatementSheet'
 import { RESUME_EVENT, useInboxState } from '../inbox/useInbox'
 import { plural } from '../lib/format'
@@ -21,7 +20,6 @@ const NATIVE = isNativeApp()
 // Sheets and slots the shared screens show only in the app.
 const SHEETS = {
   inbox: { Form: InboxSheet, tone: 'lime', kicker: 'Payments', title: () => 'Unfiled spends', wide: true },
-  scanpay: { Form: ScanPaySheet, tone: 'lime', kicker: 'Payments', title: () => 'Scan & Pay' },
   statement: { Form: StatementSheet, tone: 'sky', kicker: 'Payments', title: () => 'Import a bank statement', wide: true },
   balance: { Form: BalanceSheet, tone: 'butter', kicker: 'Weekly check', title: () => 'Balance check' },
 }
@@ -154,8 +152,8 @@ function useUpdateCheck() {
 }
 
 /**
- * Opens a payment from a notification tap or a share, opens Scan & Pay or the balance check from the shortcut and
- * the weekly reminder, and hands reply notes to Munshi.
+ * Opens a payment from a notification tap or a share, opens the balance check from the weekly reminder, and hands
+ * reply notes to Munshi.
  */
 function InboxEffects({ inbox }) {
   const finance = useFinance()
@@ -178,7 +176,7 @@ function InboxEffects({ inbox }) {
   useEffect(() => {
     if (!intent || !ready) return
     clearIntent()
-    openSheet(intent.kind === 'balance' ? 'balance' : 'scanpay')
+    if (intent.kind === 'balance') openSheet('balance')
   }, [intent, ready, clearIntent, openSheet])
 
   // "dinner, split with Ravi" typed on the notification: Munshi drafts the entries when Gullak opens.

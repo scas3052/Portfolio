@@ -2,10 +2,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { bankFromSender, bankInText, isTransactionalSender, normalize, parseApp, parseShared, parseSms, tidyName } from '../../src/finance/inbox/parse.js'
+import { bankFromSender, bankInSender, bankInText, isTransactionalSender, mailText, normalize, parseApp, parseMail, parseShared, parseSms, tidyName } from '../../src/finance/inbox/parse.js'
 
 const FIXTURES = new URL('../../native/android/app/src/test/resources/payment-fixtures.txt', import.meta.url)
-const FIELDS = ['amount', 'dir', 'account', 'party', 'vpa', 'ref', 'channel', 'balance']
+const FIELDS = ['amount', 'dir', 'account', 'party', 'vpa', 'ref', 'channel', 'balance', 'bank']
 
 function readFixtures() {
   const cases = []
@@ -27,6 +27,7 @@ function readFixtures() {
 
 function run({ kind, from, title, text }) {
   if (kind === 'sms') return parseSms(from, text)
+  if (kind === 'mail') return parseMail(from, title, text)
   if (kind === 'app') return parseApp(title, text)
   if (kind === 'share') return parseShared(text)
   throw new Error(`Unknown kind ${kind}`)
@@ -42,6 +43,7 @@ function actual(parsed, field) {
     ref: parsed.ref,
     channel: parsed.channel,
     balance: parsed.balance === null ? null : parsed.balance.toFixed(2),
+    bank: parsed.bank,
   }[field]
   return value ?? '-'
 }
@@ -50,7 +52,7 @@ const cases = readFixtures()
 
 test('the fixture file has a good spread of cases', () => {
   assert.ok(cases.length >= 40)
-  for (const kind of ['sms', 'app', 'share']) assert.ok(cases.some((c) => c.fields.kind === kind), kind)
+  for (const kind of ['sms', 'app', 'share', 'mail']) assert.ok(cases.some((c) => c.fields.kind === kind), kind)
   assert.ok(cases.filter((c) => c.fields.expect === 'none').length >= 10)
 })
 
@@ -101,4 +103,24 @@ test('whitespace of every kind collapses to single spaces', () => {
 test('amounts must be above zero and below ₹100 crore', () => {
   assert.equal(parseSms('VM-HDFCBK', 'Rs.0.00 debited from A/c XX1234'), null)
   assert.equal(parseSms('VM-HDFCBK', 'Rs.1,00,00,00,000 debited from A/c XX1234'), null)
+})
+
+test('a mail notification reads as its subject, then the email without the subject repeated', () => {
+  assert.equal(mailText('Debit alert', 'Debit alert\nHi, ₹10 debited'), 'Debit alert. Hi, ₹10 debited')
+  assert.equal(mailText('', 'Hi, ₹10 debited'), 'Hi, ₹10 debited')
+  assert.equal(mailText('Debit alert', null), 'Debit alert')
+})
+
+test('banks come from an email sender name; slice only counts there, not in message text', () => {
+  assert.equal(bankInSender('slice'), 'slice')
+  assert.equal(bankInSender('Team slice'), 'slice')
+  assert.equal(bankInSender('HDFC Bank InstaAlerts'), 'HDFC Bank')
+  assert.equal(bankInSender('Slicepay Offers'), null)
+  assert.equal(bankInSender(null), null)
+  assert.equal(bankInText('Paid ₹200 at Pizza Slice'), null)
+})
+
+test('an email date is never read as account digits', () => {
+  const parsed = parseMail('slice', '', 'Hi, ₹10 debited via UPI on 25-11-2026 to NTI00227')
+  assert.equal(parsed.account, null)
 })

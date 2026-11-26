@@ -5,7 +5,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Reads bank SMS, payment-app notifications and shared text into {@link ParsedPayment}s.
+ * Reads bank SMS, payment-app notifications, bank emails (as their mail app's notification shows them) and shared
+ * text into {@link ParsedPayment}s.
  *
  * <p>No Android imports, so it is unit-tested on the JVM against
  * {@code src/test/resources/payment-fixtures.txt}. The same fixtures drive the JavaScript twin in
@@ -17,6 +18,7 @@ public final class PaymentParser {
     static final String KIND_SMS = "sms";
     static final String KIND_APP = "app";
     static final String KIND_SHARE = "share";
+    static final String KIND_MAIL = "mail";
 
     private static final int I = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
 
@@ -67,7 +69,7 @@ public final class PaymentParser {
 
     private static final Pattern NAME = Pattern.compile(
             "^(?:vpa\\s+)?(.+?)(?=\\s+(?:on|ref|refno|upi|via|from|for|at|avl|bal|not you|if not|has|is|was|in your|using|with"
-                    + "|successfully|dated|txn|info|thru|through)\\b|\\s*[.(),;|?\u00B7]|\\s*$)", I);
+                    + "|successfully|dated|txn|info|thru|through|rrn|utr)\\b|\\s*[.(),;|?\u00B7]|\\s*$)", I);
     private static final Pattern UPI_SLASH = Pattern.compile(
             "\\bupi/[a-z0-9]{2,4}/(\\d{6,})/(.+?)(?=/|\\s+not you\\b|\\s+axis\\b|\\s*$)", I);
     private static final Pattern ICICI_PAYEE = Pattern.compile(";\\s*([a-z0-9&.' -]{2,40}?)\\s+credited\\b", I);
@@ -123,6 +125,9 @@ public final class PaymentParser {
     };
     private static final Pattern TEXT_BANK = Pattern.compile(
             "\\b(hdfc|sbi|icici|axis|kotak|pnb|idfc|idbi|indusind|canara|federal|baroda)\\b", I);
+    // slice counts only in an email's sender name: in a message's text it could be a pizza.
+    private static final Pattern SENDER_SLICE = Pattern.compile("\\bslice\\b", I);
+    private static final Pattern TRAILING_CUT = Pattern.compile("(?:\u2026|\\.{2,})?\\s*$");
 
     private PaymentParser() {}
 
@@ -141,12 +146,47 @@ public final class PaymentParser {
         return bank != null ? parsed.withBank(bank) : parsed;
     }
 
-    /** A GPay, PhonePe or Paytm notification. */
+    /** A payment or bank app's notification. */
     public static ParsedPayment parseApp(String title, String text) {
         String a = normalize(title);
         String b = normalize(text);
         String joined = a.isEmpty() ? b : b.isEmpty() ? a : a + ". " + b;
         return parseText(joined, KIND_APP);
+    }
+
+    /** One line from a mail notification: the subject, then the start of the email (Gmail repeats the subject there). */
+    public static String mailText(String subject, String body) {
+        String s = normalize(subject);
+        String b = normalize(body);
+        if (!s.isEmpty() && b.startsWith(s)) b = b.substring(s.length()).trim();
+        return s.isEmpty() ? b : b.isEmpty() ? s : s + ". " + b;
+    }
+
+    /**
+     * A bank's email as its mail app's notification shows it: the sender's name, the subject and the start of the
+     * email. Null when it isn't a completed payment. Only senders the user listed in Settings get this far.
+     */
+    public static ParsedPayment parseMail(String sender, String subject, String body) {
+        String text = mailText(subject, body);
+        ParsedPayment parsed = parseText(text, KIND_MAIL);
+        if (parsed == null) return null;
+        // A notification shows only the start of an email, so a reference at the very end may be cut short. A wrong
+        // reference would stop the payment's SMS or statement line from merging with it: better none.
+        if (parsed.ref != null && endsWith(text, parsed.ref)) parsed = parsed.withRef(null);
+        String bank = bankInSender(sender);
+        return bank != null ? parsed.withBank(bank) : parsed;
+    }
+
+    /** "slice" for slice's emails, the bank a sender name like "HDFC Bank InstaAlerts" names, or null. */
+    public static String bankInSender(String sender) {
+        if (sender == null) return null;
+        if (SENDER_SLICE.matcher(sender).find()) return "slice";
+        return bankInText(sender);
+    }
+
+    private static boolean endsWith(String text, String ref) {
+        String t = TRAILING_CUT.matcher(text).replaceFirst("").toLowerCase(Locale.ROOT);
+        return t.endsWith(ref.toLowerCase(Locale.ROOT));
     }
 
     /** Text shared to Gullak. The user picked it, so a lone amount is enough: it's read as money out. */
@@ -232,7 +272,7 @@ public final class PaymentParser {
                 || FAILED.matcher(t).find() || MANDATE_SETUP.matcher(t).find()) {
             return true;
         }
-        return KIND_APP.equals(kind) && PROMO.matcher(t).find();
+        return (KIND_APP.equals(kind) || KIND_MAIL.equals(kind)) && PROMO.matcher(t).find();
     }
 
     /** {amount, balance} in paise; -1 where the message has none. Limits and dues are never the amount. */
@@ -300,7 +340,8 @@ public final class PaymentParser {
         if (!found && !KIND_SMS.equals(kind)) {
             m = APP_ACCOUNT.matcher(t);
             found = m.find();
-            if (!found) {
+            // Emails carry dates like 25-11-2026, so the loose "- 1234" rule is only for app alerts and shared text.
+            if (!found && !KIND_MAIL.equals(kind)) {
                 m = APP_ACCOUNT_LOOSE.matcher(t);
                 found = m.find();
             }

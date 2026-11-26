@@ -1,11 +1,11 @@
-// How each place a payment came from is named on its card: bank SMS, an app's notification, a shared text, Scan &
-// Pay or a bank statement. Apps added in Settings are named from the app list the phone reports.
-import { LuFileSpreadsheet, LuMessageSquareText, LuQrCode, LuShare2, LuSmartphone } from 'react-icons/lu'
+// How each place a payment came from is named on its card: bank SMS, an app's notification, a bank email, a shared
+// text or a bank statement. Apps added in Settings are named from the app list the phone reports.
+import { LuFileSpreadsheet, LuMail, LuMessageSquareText, LuShare2, LuSmartphone } from 'react-icons/lu'
 
 const FIXED = {
   sms: ['SMS', LuMessageSquareText],
+  mail: ['Email', LuMail],
   share: ['Shared', LuShare2],
-  scanpay: ['Scan & Pay', LuQrCode],
   statement: ['Statement', LuFileSpreadsheet],
 }
 

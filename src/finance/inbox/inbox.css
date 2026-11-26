@@ -471,7 +471,7 @@
   padding-block: 4px;
 }
 
-/* ---------- capture settings: apps, and what to do when nothing tells Gullak ---------- */
+/* ---------- capture settings: apps, bank emails, and what to do when nothing tells Gullak ---------- */
 .g-capture__picker {
   display: grid;
   gap: 8px;
@@ -529,97 +529,26 @@
   padding-block: 4px;
 }
 
-/* ---------- home: balance check note and the Scan & Pay button ---------- */
+/* Bank emails: add a sender by name. */
+.g-capture__add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.g-capture__add .g-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ---------- home: balance check note ---------- */
 .g-inbox-note--balance {
   --tone: var(--mint);
-}
-
-.g-inbox-quick {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-}
-
-.g-inbox-quick__hint {
-  font-size: .8rem;
-  color: var(--ink-3);
 }
 
 .g-inbox__foot {
   flex-wrap: wrap;
   gap: 8px 16px;
-}
-
-/* ---------- Scan & Pay ---------- */
-.g-scanpay {
-  gap: 14px;
-}
-
-.g-scanpay__payee {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.g-scanpay__badge {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  font-size: 1.3rem;
-  color: var(--on-tone);
-  background: var(--tone, var(--lime));
-  border: var(--bw) solid var(--frame);
-  border-radius: var(--r-sm);
-}
-
-.g-scanpay__who {
-  min-width: 0;
-}
-
-.g-scanpay__name {
-  overflow: hidden;
-  font: 800 1.1rem/1.25 var(--font-display);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.g-scanpay__vpa {
-  font: 500 .76rem/1.4 var(--font-mono);
-  color: var(--ink-3);
-  overflow-wrap: anywhere;
-}
-
-.g-scanpay__fixed {
-  font-size: .9rem;
-  color: var(--ink-2);
-}
-
-.g-scanpay__fixed strong {
-  font: 800 1.5rem/1.2 var(--font-display);
-  color: var(--ink);
-}
-
-.g-scanpay__wait,
-.g-scanpay__question,
-.g-scanpay__done {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font: 600 .95rem/1.45 var(--font-body);
-}
-
-.g-scanpay__wait > svg,
-.g-scanpay__done > svg {
-  flex: none;
-  margin-top: 2px;
-  font-size: 1.3rem;
-}
-
-.g-scanpay__done > svg {
-  color: var(--pos);
 }
 
 /* ---------- statement import ---------- */

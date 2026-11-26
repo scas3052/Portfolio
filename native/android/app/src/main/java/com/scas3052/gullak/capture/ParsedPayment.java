@@ -42,6 +42,10 @@ public final class ParsedPayment {
         return new ParsedPayment(amountPaise, direction, account, party, vpa, ref, channel, newBank, balancePaise);
     }
 
+    ParsedPayment withRef(String newRef) {
+        return new ParsedPayment(amountPaise, direction, account, party, vpa, newRef, channel, bank, balancePaise);
+    }
+
     @Override
     public String toString() {
         return "ParsedPayment{" + amountPaise + " " + direction + ", account=" + account + ", party=" + party

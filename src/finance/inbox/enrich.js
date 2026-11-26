@@ -46,7 +46,7 @@ export function sameBank(hint, bank) {
 }
 
 /**
- * The account a payment went through: the account picked for it in Gullak (Scan & Pay, a statement import), then
+ * The account a payment went through: the account picked for it in Gullak (a statement import), then
  * a remembered alias for its digits, then the one account ending in those digits, then (cards without digits)
  * the one card of that bank. `{account, how}` or `{account: null}`.
  */

@@ -10,6 +10,4 @@
     <string name="channel_payments_desc">One note for each payment Gullak catches, so you can say what it was for.</string>
     <string name="channel_balance">Balance checks</string>
     <string name="channel_balance_desc">A weekly reminder to compare what your banks show with Gullak.</string>
-    <string name="shortcut_scan_short">Scan &amp; Pay</string>
-    <string name="shortcut_scan_long">Scan a QR and pay</string>
 </resources>

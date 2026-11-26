@@ -1,6 +1,8 @@
 package com.scas3052.gullak.capture;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -128,22 +130,59 @@ public class SpendMergerTest {
     }
 
     @Test
-    public void scanAndPayMergesWithTheAppsAlertButNotWithAnotherScan() {
-        List<SpendMerger.Fields> recent = Arrays.asList(spend(12000, "out", T0, "scanpay", null));
-        assertEquals(0, SpendMerger.match(recent, spend(12000, "out", T0 + MIN, "gpay", null)));
-        assertEquals(0, SpendMerger.match(recent, spend(12000, "out", T0 + MIN, "sms", null)));
-        assertEquals(-1, SpendMerger.match(recent, spend(12000, "out", T0 + MIN, "scanpay", null)));
+    public void aBankEmailJoinsTheSameAppAlertOrSmsUpToTwoHoursLater() {
+        List<SpendMerger.Fields> recent = Arrays.asList(spend(1000, "out", T0, "gpay", null));
+        assertEquals(0, SpendMerger.match(recent, spend(1000, "out", T0 + 40 * MIN, "mail", "632900000843")));
+        assertEquals(-1, SpendMerger.match(recent, spend(1000, "out", T0 + 3 * 60 * MIN, "mail", null)));
+        List<SpendMerger.Fields> mailFirst = Arrays.asList(spend(1000, "out", T0, "mail", null));
+        assertEquals(0, SpendMerger.match(mailFirst, spend(1000, "out", T0 + 90 * MIN, "sms", null)));
+    }
+
+    @Test
+    public void twoEmailsStaySeparateUnlessTheyShareAReference() {
+        List<SpendMerger.Fields> recent = Arrays.asList(spend(1000, "out", T0, "mail", "632900000843"));
+        assertEquals(-1, SpendMerger.match(recent, spend(1000, "out", T0 + MIN, "mail", "632900000844")));
+        assertEquals(-1, SpendMerger.match(recent, spend(1000, "out", T0 + MIN, "mail", null)));
+        assertEquals(0, SpendMerger.match(recent, spend(1000, "out", T0 + MIN, "mail", "632900000843")));
+    }
+
+    @Test
+    public void anEmailNeverJoinsAPaymentOnAnotherAccountOrBank() {
+        SpendMerger.Fields sms = spend(1000, "out", T0, "sms", null);
+        sms.account = "4821";
+        sms.bank = "HDFC Bank";
+        SpendMerger.Fields otherAccount = spend(1000, "out", T0 + MIN, "mail", null);
+        otherAccount.account = "4410";
+        assertEquals(-1, SpendMerger.match(Arrays.asList(sms), otherAccount));
+        SpendMerger.Fields otherBank = spend(1000, "out", T0 + MIN, "mail", null);
+        otherBank.bank = "slice";
+        assertEquals(-1, SpendMerger.match(Arrays.asList(sms), otherBank));
+        SpendMerger.Fields same = spend(1000, "out", T0 + MIN, "mail", null);
+        same.account = "4821";
+        same.bank = "hdfc bank";
+        assertEquals(0, SpendMerger.match(Arrays.asList(sms), same));
+    }
+
+    @Test
+    public void appsStillNeedTheSamePayeeWhenAnEmailIsAlreadyIn() {
+        SpendMerger.Fields both = spend(2000, "out", T0, "gpay,mail", null);
+        both.party = "Chai Point";
+        SpendMerger.Fields otherPayee = spend(2000, "out", T0 + MIN, "phonepe", null);
+        otherPayee.party = "Ravi Kumar";
+        assertEquals(-1, SpendMerger.match(Arrays.asList(both), otherPayee));
     }
 
     @Test
     public void accountsPickedInGullakMustAgree() {
-        SpendMerger.Fields paid = spend(12000, "out", T0, "scanpay", null);
-        paid.accountId = "acc_slice";
-        SpendMerger.Fields line = spend(12000, "out", T0 + 60 * MIN, "statement", null);
-        line.accountId = "acc_hdfc";
-        assertEquals(-1, SpendMerger.match(Arrays.asList(paid), line));
+        SpendMerger.Fields line = spend(12000, "out", T0, "statement", null);
         line.accountId = "acc_slice";
-        assertEquals(0, SpendMerger.match(Arrays.asList(paid), line));
+        SpendMerger.Fields other = spend(12000, "out", T0, "sms", null);
+        other.accountId = "acc_hdfc";
+        assertFalse(SpendMerger.compatible(line, other));
+        other.accountId = "acc_slice";
+        assertTrue(SpendMerger.compatible(line, other));
+        other.accountId = null;
+        assertTrue(SpendMerger.compatible(line, other));
     }
 
     @Test

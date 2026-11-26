@@ -1,4 +1,5 @@
-// Reads bank SMS, payment-app notifications and shared text into payment fields.
+// Reads bank SMS, payment-app notifications, bank emails (as their mail app's notification shows them) and shared
+// text into payment fields.
 //
 // This is the JavaScript twin of the app's native parser
 // (native/android/app/src/main/java/com/scas3052/gullak/capture/PaymentParser.java). The phone runs the
@@ -45,7 +46,7 @@ const REF =
 
 // Where a payee or payer name ends.
 const NAME =
-  /^(?:vpa\s+)?(.+?)(?=\s+(?:on|ref|refno|upi|via|from|for|at|avl|bal|not you|if not|has|is|was|in your|using|with|successfully|dated|txn|info|thru|through)\b|\s*[.(),;|?·]|\s*$)/i
+  /^(?:vpa\s+)?(.+?)(?=\s+(?:on|ref|refno|upi|via|from|for|at|avl|bal|not you|if not|has|is|was|in your|using|with|successfully|dated|txn|info|thru|through|rrn|utr)\b|\s*[.(),;|?·]|\s*$)/i
 const UPI_SLASH = /\bupi\/[a-z0-9]{2,4}\/(\d{6,})\/(.+?)(?=\/|\s+not you\b|\s+axis\b|\s*$)/i
 const ICICI_PAYEE = /;\s*([a-z0-9&.' -]{2,40}?)\s+credited\b/i
 const AFTER_DATE = /\bon\s+\d{1,2}[-/ ]?[a-z]{3}[-/ ]?\d{2,4}\s+on\s+/gi
@@ -104,6 +105,9 @@ const TEXT_BANKS = {
   baroda: 'Bank of Baroda',
 }
 const TEXT_BANK = /\b(hdfc|sbi|icici|axis|kotak|pnb|idfc|idbi|indusind|canara|federal|baroda)\b/i
+// slice counts only in an email's sender name: in a message's text it could be a pizza.
+const SENDER_SLICE = /\bslice\b/i
+const TRAILING_CUT = /(?:…|\.{2,})?\s*$/
 
 /** True for bank-style sender ids (VM-HDFCBK-S, HDFCBK, 57575); false for phone numbers and -P promos. */
 export function isTransactionalSender(sender) {
@@ -177,7 +181,9 @@ function channelOf(cleaned, vpa, kind) {
 }
 
 function accountIn(t, kind) {
-  const match = ACCOUNT.exec(t) || (kind !== 'sms' ? APP_ACCOUNT.exec(t) || APP_ACCOUNT_LOOSE.exec(t) : null)
+  // Emails carry dates like 25-11-2026, so the loose "- 1234" rule is only for app alerts and shared text.
+  const loose = kind !== 'mail' ? APP_ACCOUNT_LOOSE.exec(t) : null
+  const match = ACCOUNT.exec(t) || (kind !== 'sms' ? APP_ACCOUNT.exec(t) || loose : null)
   if (!match) return null
   const digits = match[1]
   return digits.length > 4 ? digits.slice(-4) : digits
@@ -243,7 +249,7 @@ function partyOf(t, direction, channel, kind) {
 
 function skipped(t, kind) {
   if (OTP_MESSAGE.test(t) || FUTURE.test(t) || REQUEST.test(t) || FAILED.test(t) || MANDATE_SETUP.test(t)) return true
-  return kind === 'app' && PROMO.test(t)
+  return (kind === 'app' || kind === 'mail') && PROMO.test(t)
 }
 
 function parseText(raw, kind) {
@@ -280,9 +286,38 @@ export function parseSms(sender, body) {
   return parsed && { ...parsed, bank: bankFromSender(sender) || parsed.bank }
 }
 
-/** A GPay, PhonePe or Paytm notification. */
+/** A payment or bank app's notification. */
 export function parseApp(title, text) {
   return parseText([title, text].map(normalize).filter(Boolean).join('. '), 'app')
+}
+
+/** One line from a mail notification: the subject, then the start of the email (Gmail repeats the subject there). */
+export function mailText(subject, body) {
+  const s = normalize(subject)
+  let b = normalize(body)
+  if (s && b.startsWith(s)) b = b.slice(s.length).trim()
+  return [s, b].filter(Boolean).join('. ')
+}
+
+/** "slice" for slice's emails, the bank a sender name like "HDFC Bank InstaAlerts" names, or null. */
+export function bankInSender(sender) {
+  if (sender == null) return null
+  if (SENDER_SLICE.test(String(sender))) return 'slice'
+  return bankInText(sender)
+}
+
+/**
+ * A bank's email as its mail app's notification shows it: the sender's name, the subject and the start of the
+ * email. Null when it isn't a completed payment. Only senders the user listed in Settings get this far.
+ */
+export function parseMail(sender, subject, body) {
+  const text = mailText(subject, body)
+  const parsed = parseText(text, 'mail')
+  if (!parsed) return null
+  // A notification shows only the start of an email, so a reference at the very end may be cut short. A wrong
+  // reference would stop the payment's SMS or statement line from merging with it: better none.
+  const cut = parsed.ref && text.replace(TRAILING_CUT, '').toLowerCase().endsWith(parsed.ref.toLowerCase())
+  return { ...parsed, ref: cut ? null : parsed.ref, bank: bankInSender(sender) || parsed.bank }
 }
 
 /** Text shared to Gullak. The user picked it, so a lone amount is enough: it's read as money out. */

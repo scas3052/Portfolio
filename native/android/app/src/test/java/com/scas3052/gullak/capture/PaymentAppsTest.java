@@ -40,6 +40,21 @@ public class PaymentAppsTest {
     }
 
     @Test
+    public void mailAppsAreReadOnlyForBankSendersNeverAsPaymentApps() {
+        Set<String> added = new HashSet<>(Arrays.asList("com.google.android.gm"));
+        assertTrue(PaymentApps.isMail("com.google.android.gm"));
+        assertTrue(PaymentApps.isMail("com.microsoft.office.outlook"));
+        assertFalse(PaymentApps.isMail("com.phonepe.app"));
+        assertFalse(PaymentApps.isMail(null));
+        assertNull(PaymentApps.sourceFor("com.google.android.gm", added));
+        assertFalse(PaymentApps.addable("com.google.android.gm", "com.scas3052.gullak"));
+        for (PaymentApps.App app : PaymentApps.MAIL) {
+            assertEquals(SpendMerger.KIND_MAIL, SpendMerger.kindOf(app.source));
+            assertNull(app.packageName, PaymentApps.builtIn(app.packageName));
+        }
+    }
+
+    @Test
     public void sourceNamesAndPackagesAreUniqueAndNeverClashWithOtherSources() {
         Set<String> sources = new HashSet<>();
         Set<String> packages = new HashSet<>();

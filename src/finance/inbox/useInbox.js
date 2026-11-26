@@ -1,7 +1,7 @@
 // Captured payments in the app: the list from the phone, permission status, and the actions that file,
 // dismiss and restore them. The phone's SQLite store stays the source of truth; this mirrors it and updates
-// optimistically so cards move the moment you tap. Also the phone's side of Scan & Pay, statement import, the
-// apps Gullak reads and the weekly balance check reminder.
+// optimistically so cards move the moment you tap. Also the phone's side of statement import, the apps and bank
+// email senders Gullak reads, and the weekly balance check reminder.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { loadCapture } from './bridge'
 import { normalizeSpend } from './enrich'
@@ -94,8 +94,7 @@ export function useInboxState() {
     listen('openSpend', (data) => {
       if (data?.id) setOpening({ id: String(data.id), at: Date.now() })
     })
-    // The Scan & Pay shortcut and the weekly balance reminder open their screens.
-    listen('scanPay', () => setIntent({ kind: 'scanpay', at: Date.now() }))
+    // The weekly balance reminder opens the balance check.
     listen('balanceCheck', () => setIntent({ kind: 'balance', at: Date.now() }))
     // Catch up on the SMS inbox now (queued: the list updates once the phone answers) and whenever Gullak
     // comes back to the foreground.
@@ -177,18 +176,17 @@ export function useInboxState() {
   const addApp = useCallback((pkg, label) => withStatus('addApp', { package: pkg, label }), [withStatus])
   const removeApp = useCallback((pkg) => withStatus('removeApp', { package: pkg }), [withStatus])
 
-  // Scan & Pay: scan, hand the payment to a UPI app, then record it.
-  const scanQr = useCallback(() => attempt('scanQr'), [attempt])
-  const listUpiApps = useCallback(async () => (await call('listUpiApps'))?.apps || [], [call])
-  const payUpi = useCallback((uri, pkg) => attempt('payUpi', { uri, package: pkg || null }), [attempt])
-  const recordPayment = useCallback(
-    async (payment) => {
-      const result = await attempt('recordPayment', payment)
-      await refresh()
+  // Bank emails: whose emails are read (Settings → Payment capture → Bank emails).
+  /** Starts reading payment emails from a sender: `{ok: true}`, or `{ok: false, error}` for an empty name or a full list. */
+  const addMailSender = useCallback(
+    async (name) => {
+      const result = await attempt('addMailSender', { name })
+      if (result.ok && result.value && typeof result.value === 'object' && 'sms' in result.value) setStatus(result.value)
       return result
     },
-    [attempt, refresh],
+    [attempt],
   )
+  const removeMailSender = useCallback((name) => withStatus('removeMailSender', { name }), [withStatus])
 
   /** Stores checked statement lines as unfiled spends: `{ok, value: {added, merged, duplicates}}`. */
   const importSpends = useCallback(
@@ -235,10 +233,8 @@ export function useInboxState() {
       listApps,
       addApp,
       removeApp,
-      scanQr,
-      listUpiApps,
-      payUpi,
-      recordPayment,
+      addMailSender,
+      removeMailSender,
       importSpends,
       setBalanceReminder,
     }),
@@ -271,10 +267,8 @@ export function useInboxState() {
       listApps,
       addApp,
       removeApp,
-      scanQr,
-      listUpiApps,
-      payUpi,
-      recordPayment,
+      addMailSender,
+      removeMailSender,
       importSpends,
       setBalanceReminder,
     ],

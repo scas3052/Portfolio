@@ -39,7 +39,7 @@ test('accounts match by their last digits, then by a remembered alias', () => {
   assert.deepEqual([aliased.account.id, aliased.how], ['sa_sbi', 'alias'])
 })
 
-test('the account picked in Gullak (Scan & Pay, a statement import) wins over digits and aliases', () => {
+test('the account picked in Gullak (a statement import) wins over digits and aliases', () => {
   const { state } = makeCtx()
   const chosen = matchAccount(spend({ accountId: 'sa_sbi', account: '4821' }), state.accounts, { 4821: 'sa_hdfc' })
   assert.deepEqual([chosen.account.id, chosen.how], ['sa_sbi', 'chosen'])

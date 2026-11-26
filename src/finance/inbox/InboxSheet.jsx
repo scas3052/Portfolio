@@ -14,7 +14,6 @@ import {
   LuPencil,
   LuSendHorizontal,
   LuFileSpreadsheet,
-  LuQrCode,
   LuSettings2,
   LuWandSparkles,
 } from 'react-icons/lu'
@@ -455,9 +454,6 @@ export default function InboxSheet({ focus = null, onDone }) {
         </>
       )}
       <p className="g-inbox__foot">
-        <button type="button" className="g-link" onClick={() => ui.openSheet('scanpay')}>
-          <LuQrCode aria-hidden="true" /> Scan &amp; Pay
-        </button>
         <button type="button" className="g-link" onClick={() => ui.openSheet('statement')}>
           <LuFileSpreadsheet aria-hidden="true" /> Import a statement
         </button>

@@ -1,14 +1,11 @@
 import { useSyncExternalStore } from 'react'
-import { LuArrowRight, LuDownload, LuQrCode, LuScale, LuSmartphoneNfc } from 'react-icons/lu'
+import { LuArrowRight, LuDownload, LuScale, LuSmartphoneNfc } from 'react-icons/lu'
 import { plural } from '../lib/format'
 import { navigate } from '../lib/router'
 import { useApp, useFinance, useUi } from '../store/contexts'
 import { dueChecks, readChecks, subscribeChecks } from './balance'
 
-/**
- * Home notes in the app: an update to install, unfiled spends to file, a balance check that's due, or capture
- * still to switch on; and the Scan & Pay button.
- */
+/** Home notes in the app: an update to install, unfiled spends to file, a balance check that's due, or capture still to switch on. */
 export default function InboxBanner() {
   const app = useApp()
   const { openSheet } = useUi()
@@ -63,19 +60,11 @@ export default function InboxBanner() {
         <button type="button" className="g-inbox-note g-inbox-note--setup g-press" onClick={() => navigate('settings', { focus: 'capture' })}>
           <LuSmartphoneNfc className="g-inbox-note__icon" aria-hidden="true" />
           <span className="g-inbox-note__text">
-            <strong>Catch payments automatically.</strong> Gullak can read bank SMS and payment app alerts, then ask what each
-            payment was for.
+            <strong>Catch payments automatically.</strong> Gullak can read bank SMS, payment app alerts and bank emails, then
+            ask what each payment was for.
           </span>
           <LuArrowRight className="g-inbox-note__go" aria-hidden="true" />
         </button>
-      )}
-      {inbox.available && (
-        <div className="g-inbox-quick">
-          <button type="button" className="g-btn g-btn--sm g-btn--ink g-press" onClick={() => openSheet('scanpay')}>
-            <LuQrCode aria-hidden="true" /> Scan &amp; Pay
-          </button>
-          <span className="g-inbox-quick__hint">Pay any UPI QR and it’s in Gullak straight away.</span>
-        </div>
       )}
     </div>
   )

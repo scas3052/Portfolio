@@ -29,7 +29,7 @@ public final class SpendStore extends SQLiteOpenHelper {
     public static final String DISMISSED = "dismissed";
 
     private static final String DB_NAME = "gullak_capture.db";
-    /** 2 added account_id: the Gullak account picked for a Scan & Pay payment or a statement import. */
+    /** 2 added account_id: the Gullak account picked for a statement import. */
     private static final int DB_VERSION = 2;
     private static final long DAY_MS = 24L * 60 * 60 * 1000;
     private static final long KEEP_CLOSED_MS = 30 * DAY_MS;
@@ -38,6 +38,8 @@ public final class SpendStore extends SQLiteOpenHelper {
     private static final long MATCH_BACK_MS = 3 * DAY_MS;
     private static final long SMS_SEEN_WINDOW_MS = 10 * 60 * 1000L;
     private static final long APP_SEEN_WINDOW_MS = 5 * 60 * 1000L;
+    /** Mail apps can post the same email's notification again hours later (after a sync, or when more mail comes). */
+    private static final long MAIL_SEEN_WINDOW_MS = 6 * 60 * 60 * 1000L;
 
     private static final String COLUMNS = "id, status, amount, direction, at, account, party, vpa, ref, channel, bank, balance,"
             + " sources, raw IS NOT NULL AS has_raw, hint, hint_at, entry_ids, created_at, closed_at, account_id";
@@ -134,12 +136,13 @@ public final class SpendStore extends SQLiteOpenHelper {
         return capture(p, source, sender, text, at, now, null);
     }
 
-    /** {@link #capture} for a payment the user tied to one of their Gullak accounts (Scan & Pay, statement import). */
+    /** {@link #capture} for a payment the user tied to one of their Gullak accounts (a statement import). */
     public synchronized Captured capture(ParsedPayment p, String source, String sender, String text, long at, long now,
             String accountId) {
         SQLiteDatabase db = getWritableDatabase();
         String hash = sha1(source + "|" + (sender == null ? "" : sender.trim().toUpperCase(Locale.ROOT)) + "|" + PaymentParser.normalize(text));
-        long window = SpendMerger.KIND_SMS.equals(source) ? SMS_SEEN_WINDOW_MS : APP_SEEN_WINDOW_MS;
+        long window = SpendMerger.KIND_SMS.equals(source) ? SMS_SEEN_WINDOW_MS
+                : SpendMerger.KIND_MAIL.equals(source) ? MAIL_SEEN_WINDOW_MS : APP_SEEN_WINDOW_MS;
         if (seenNear(db, hash, at, window)) return new Captured(null, false, true);
 
         db.beginTransaction();

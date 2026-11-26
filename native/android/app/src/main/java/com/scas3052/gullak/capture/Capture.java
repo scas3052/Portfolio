@@ -21,17 +21,16 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Where every captured message goes: bank SMS (live and catch-up), payment-app notifications, shared text,
- * Scan & Pay payments and imported statement lines. Each is parsed, stored as an unfiled spend (or merged into
- * its twin) and, for live payments, nudged about. Nothing here writes to the money book: the user files each
- * spend in the app.
+ * Where every captured message goes: bank SMS (live and catch-up), payment-app notifications, bank emails (read from
+ * the mail app's notification) and shared text. Each is parsed, stored as an unfiled spend (or merged into its twin)
+ * and, for live payments, nudged about. Nothing here writes to the money book: the user files each spend in the app.
  */
 public final class Capture {
 
     static final String PREFS = "gullak_capture";
     static final String SOURCE_SMS = "sms";
     static final String SOURCE_SHARE = "share";
-    static final String SOURCE_SCANPAY = "scanpay";
+    static final String SOURCE_MAIL = "mail";
     static final String SOURCE_STATEMENT = "statement";
 
     static final String PREF_PAUSED = "paused";
@@ -41,6 +40,10 @@ public final class Capture {
     static final String PREF_ADDED_APPS = "added_apps";
     /** Package names (never text) of apps that posted notifications lately, for Settings → Add app. */
     static final String PREF_SEEN_APPS = "seen_apps";
+    /** Bank email senders to read (Settings → Bank emails), a JSON array of names. Unset means slice only. */
+    static final String PREF_MAIL_SENDERS = "mail_senders";
+    /** The last email from a listed sender: who sent it, when, and whether it was a payment (never what it said). */
+    static final String PREF_MAIL_LAST = "mail_last";
 
     private static final long SEEN_EVERY_MS = 6 * 60 * 60 * 1000L;
     private static final long SEEN_KEEP_MS = 30L * 24 * 60 * 60 * 1000;
@@ -52,6 +55,7 @@ public final class Capture {
 
     private static final ExecutorService WORK = Executors.newSingleThreadExecutor();
     private static volatile Map<String, String> addedCache;
+    private static volatile List<String> mailCache;
     private static final Map<String, Long> seenRecently = new ConcurrentHashMap<>();
 
     private Capture() {}
@@ -81,10 +85,11 @@ public final class Capture {
         return PaymentApps.sourceFor(pkg, addedApps(context).keySet());
     }
 
-    /** Every source the user can switch on and off: bank SMS, the built-in apps and the apps they added. */
+    /** Every source the user can switch on and off: bank SMS, bank emails, the built-in apps and the apps they added. */
     static List<String> sourceIds(Context context) {
         List<String> ids = new ArrayList<>();
         ids.add(SOURCE_SMS);
+        ids.add(SOURCE_MAIL);
         for (PaymentApps.App app : PaymentApps.BUILT_IN) ids.add(app.source);
         ids.addAll(addedApps(context).keySet());
         return ids;
@@ -139,6 +144,73 @@ public final class Capture {
         if (apps.remove(pkg) == null) return;
         saveAddedApps(context, apps);
         prefs(context).edit().remove("src_" + pkg).apply();
+    }
+
+    /** The bank email senders Gullak reads, in the order they were added. Cached: every mail notification asks. */
+    static List<String> mailSenders(Context context) {
+        List<String> cached = mailCache;
+        if (cached != null) return cached;
+        List<String> senders = new ArrayList<>();
+        String saved = prefs(context).getString(PREF_MAIL_SENDERS, null);
+        if (saved == null) {
+            Collections.addAll(senders, MailSenders.DEFAULT);
+        } else {
+            try {
+                JSONArray list = new JSONArray(saved);
+                for (int i = 0; i < list.length(); i++) {
+                    String name = MailSenders.clean(list.optString(i, ""));
+                    if (name != null) senders.add(name);
+                }
+            } catch (JSONException e) {
+                Collections.addAll(senders, MailSenders.DEFAULT);
+            }
+        }
+        mailCache = Collections.unmodifiableList(senders);
+        return mailCache;
+    }
+
+    private static void saveMailSenders(Context context, List<String> senders) {
+        JSONArray list = new JSONArray();
+        for (String sender : senders) list.put(sender);
+        prefs(context).edit().putString(PREF_MAIL_SENDERS, list.toString()).apply();
+        mailCache = Collections.unmodifiableList(new ArrayList<>(senders));
+    }
+
+    /** Starts reading payment emails from {@code name} (already tidied). False only when the list is full. */
+    static synchronized boolean addMailSender(Context context, String name) {
+        List<String> senders = new ArrayList<>(mailSenders(context));
+        for (String sender : senders) {
+            if (MailSenders.same(sender, name)) return true;
+        }
+        if (senders.size() >= MailSenders.MAX_SENDERS) return false;
+        senders.add(name);
+        saveMailSenders(context, senders);
+        return true;
+    }
+
+    /** Stops reading emails from {@code name}. Payments already caught from them stay. */
+    static synchronized void removeMailSender(Context context, String name) {
+        List<String> senders = new ArrayList<>(mailSenders(context));
+        boolean removed = false;
+        Iterator<String> it = senders.iterator();
+        while (it.hasNext()) {
+            if (MailSenders.same(it.next(), name)) {
+                it.remove();
+                removed = true;
+            }
+        }
+        if (removed) saveMailSenders(context, senders);
+    }
+
+    /** The last email from a listed sender as {sender, at, payment}, or null before the first one. */
+    static JSONObject lastMail(Context context) {
+        String saved = prefs(context).getString(PREF_MAIL_LAST, null);
+        if (saved == null) return null;
+        try {
+            return new JSONObject(saved);
+        } catch (JSONException e) {
+            return null;
+        }
     }
 
     /**
@@ -207,17 +279,40 @@ public final class Capture {
         afterCapture(context, captured, true);
     }
 
+    /** True when an email from {@code from} is one Gullak reads: capture on, bank emails on, and a listed sender. */
+    static boolean readsMailFrom(Context context, String from) {
+        return !paused(context) && sourceOn(context, SOURCE_MAIL) && MailSenders.match(from, mailSenders(context)) != null;
+    }
+
     /**
-     * A payment the user made or imported in Gullak itself (Scan & Pay, a statement line), tied to the account they
-     * picked. Stored like any other message, so the payment's SMS or app alert merges into it; never nudged about,
-     * since the user is in Gullak already.
+     * A new-mail notification from a mail app ({@code from} is the sender's name as the notification shows it). Read
+     * only when the sender matches a name listed in Settings → Bank emails; every other email is ignored without its
+     * subject or text being read.
      */
-    static SpendStore.Captured onDirect(Context context, ParsedPayment parsed, String source, String sender, String text, long at,
-            String accountId) {
+    static void onMail(Context context, String from, String subject, String body, long at) {
+        if (!readsMailFrom(context, from)) return;
+        ParsedPayment parsed = PaymentParser.parseMail(from, subject, body);
+        noteMail(context, from, at, parsed != null);
+        if (parsed == null) {
+            SpendCapturePlugin.changed();
+            return;
+        }
         long now = System.currentTimeMillis();
-        SpendStore.Captured captured = SpendStore.get(context).capture(parsed, source, sender, text, at, now, accountId);
-        if (captured != null && !captured.duplicate) SpendCapturePlugin.changed();
-        return captured;
+        String text = PaymentParser.mailText(subject, body);
+        SpendStore.Captured captured = SpendStore.get(context).capture(parsed, SOURCE_MAIL, from, text, at, now);
+        afterCapture(context, captured, true);
+    }
+
+    private static void noteMail(Context context, String from, long at, boolean payment) {
+        JSONObject last = new JSONObject();
+        try {
+            last.put("sender", from.length() > MailSenders.MAX_NAME ? from.substring(0, MailSenders.MAX_NAME) : from);
+            last.put("at", at);
+            last.put("payment", payment);
+        } catch (JSONException e) {
+            return;
+        }
+        prefs(context).edit().putString(PREF_MAIL_LAST, last.toString()).apply();
     }
 
     /** Text shared to Gullak. Returns the spend it became (new or merged), or null when it has no amount. */
@@ -296,9 +391,7 @@ public final class Capture {
 
     private static void afterCapture(Context context, SpendStore.Captured captured, boolean nudge) {
         if (captured == null || captured.duplicate || captured.spend == null) return;
-        // A payment made with Scan & Pay was already asked about in Gullak; its app alert or SMS just joins it.
-        boolean paidInGullak = SpendMerger.hasKind(captured.spend.sources, SpendMerger.KIND_PAY);
-        if (nudge && !paidInGullak && SpendStore.UNFILED.equals(captured.spend.status)) {
+        if (nudge && SpendStore.UNFILED.equals(captured.spend.status)) {
             SpendNotifier.show(context, captured.spend, !captured.isNew);
         }
         SpendCapturePlugin.changed();

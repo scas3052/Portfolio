@@ -4,10 +4,10 @@ import {
   LuCircleCheck,
   LuFileSpreadsheet,
   LuInfo,
+  LuMail,
   LuMessageSquareText,
   LuPause,
   LuPlus,
-  LuQrCode,
   LuRefreshCw,
   LuScale,
   LuSearch,
@@ -18,6 +18,7 @@ import {
 import { Segmented } from '../components/bits'
 import { categoryMeta, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../lib/categories'
 import { cx } from '../lib/cx'
+import { relativeDay, toISODate } from '../lib/dates'
 import { plural } from '../lib/format'
 import { useApp, useFinance, useUi } from '../store/contexts'
 import { checkable, readChecks, REMINDER_HOUR, subscribeChecks, updateChecks } from './balance'
@@ -32,6 +33,7 @@ const LOOKBACK = [
 ]
 
 const RULES_SHOWN = 12
+const clock = (at) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
 function Switch({ on, label, onToggle, disabled }) {
   return (
@@ -131,6 +133,108 @@ function AddApp({ inbox, ui }) {
   )
 }
 
+/** What the Bank emails section says about the phone's mail apps and the last email from a listed sender. */
+function mailNote(mail, today) {
+  const apps = Array.isArray(mail.apps) ? mail.apps : []
+  if (!apps.length) return 'No mail app found on this phone. Install Gmail or Outlook and sign in with the address your bank writes to.'
+  const last = mail.last?.at > 0 ? mail.last : null
+  if (!last) return `No email from these senders yet. Gullak reads the ${apps.join(', ')} notifications for them.`
+  const when = `${relativeDay(toISODate(new Date(last.at)), today)}, ${clock(last.at)}`
+  return `Last email from ${last.sender}: ${when} · ${last.payment ? 'a payment, caught' : 'not a payment, skipped'}.`
+}
+
+/**
+ * Settings → Payment capture → Bank emails, for accounts that email instead of texting (slice does): Gullak reads
+ * the mail app's notification for the senders listed here and ignores every other email.
+ */
+function MailSettings({ inbox, ui, status, today }) {
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+  const mail = status.mail || {}
+  const senders = Array.isArray(mail.senders) ? mail.senders : []
+  const on = status.sources?.mail !== false
+
+  const add = async (event) => {
+    event.preventDefault()
+    const typed = name.trim()
+    if (!typed) return
+    const result = await inbox.addMailSender(typed)
+    if (!result.ok) {
+      setError(result.error)
+      return
+    }
+    setName('')
+    setError('')
+    ui.toast(`Gullak now reads payment emails from ${typed}`, { tone: 'lime' })
+  }
+
+  const remove = (sender) => {
+    void inbox.removeMailSender(sender)
+    ui.toast(`Gullak no longer reads emails from ${sender}`, { tone: 'gray' })
+  }
+
+  return (
+    <div className="g-capture__more">
+      <h3 className="g-capture__title">Bank emails</h3>
+      <div className="g-settings__row">
+        <span className="g-settings__label">
+          <span>
+            <LuMail aria-hidden="true" /> Read bank emails
+          </span>
+          <small>For accounts that email you instead of texting. Gullak reads the notification your mail app shows.</small>
+        </span>
+        <Switch on={on} label="Read bank emails" disabled={status.paused} onToggle={() => inbox.setPrefs({ sources: { mail: !on } })} />
+      </div>
+      {senders.length > 0 ? (
+        <ul className="g-capture__apps" aria-label="Email senders Gullak reads">
+          {senders.map((sender) => (
+            <li key={sender} className="g-capture__app">
+              <span className="g-capture__payee">
+                {sender}
+                <small>Payment emails from this sender</small>
+              </span>
+              <button type="button" className="g-icon-btn g-press" aria-label={`Stop reading emails from ${sender}`} onClick={() => remove(sender)}>
+                <LuTrash2 aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="g-settings__note">No senders yet. Add the name your bank’s emails come from.</p>
+      )}
+      <form className="g-capture__add" onSubmit={add}>
+        <input
+          className="g-input"
+          value={name}
+          onChange={(event) => {
+            setName(event.target.value)
+            setError('')
+          }}
+          placeholder="Sender’s name, as your mail app shows it"
+          aria-label="Sender’s name"
+          autoComplete="off"
+          maxLength={60}
+        />
+        <button type="submit" className="g-btn g-btn--sm g-press" disabled={!name.trim()}>
+          <LuPlus aria-hidden="true" /> Add
+        </button>
+      </form>
+      {error && (
+        <p className="g-settings__note" role="alert">
+          {error}
+        </p>
+      )}
+      {on && senders.length > 0 && <p className="g-settings__note">{mailNote(mail, today)}</p>}
+      <p className="g-settings__fine">
+        <LuInfo aria-hidden="true" /> Gullak sees only the emails your phone notifies you about, and nothing from other
+        senders. Gmail notifies for the Primary tab by default: if slice’s emails land in Updates, open one in Gmail on a
+        computer → ⋮ → <strong>Filter messages like these</strong> → <strong>Create filter</strong> → Categorise as{' '}
+        <strong>Primary</strong>.
+      </p>
+    </div>
+  )
+}
+
 /** Settings → Payment capture → Weekly balance check: on or off, which day, and which accounts. */
 function BalanceCheckSettings({ inbox, ui, accounts }) {
   const checks = useSyncExternalStore(subscribeChecks, readChecks, readChecks)
@@ -210,7 +314,7 @@ function BalanceCheckSettings({ inbox, ui, accounts }) {
 /** Settings → Payment capture (Android app): what Gullak may read, how far back, and what it has learned. */
 export default function CaptureSettings() {
   const inbox = useApp()?.inbox
-  const { state } = useFinance()
+  const { state, today } = useFinance()
   const ui = useUi()
   const [showAll, setShowAll] = useState(false)
   const [scanning, setScanning] = useState(false)
@@ -219,7 +323,8 @@ export default function CaptureSettings() {
   if (!inbox.available) {
     return (
       <p className="g-settings__note">
-        Payment capture runs in the Gullak app on an Android phone, where it can read bank SMS and UPI app notifications.
+        Payment capture runs in the Gullak app on an Android phone, where it can read bank SMS, UPI app notifications and
+        bank emails.
       </p>
     )
   }
@@ -258,8 +363,8 @@ export default function CaptureSettings() {
   return (
     <div className="g-capture">
       <p className="g-settings__note">
-        Gullak catches payments from bank SMS and UPI apps and keeps them as <strong>unfiled spends</strong>. Nothing goes
-        into your book until you say what each one was for.
+        Gullak catches payments from bank SMS, UPI apps and bank emails and keeps them as <strong>unfiled spends</strong>.
+        Nothing goes into your book until you say what each one was for.
       </p>
 
       <ol className="g-capture__steps">
@@ -278,7 +383,7 @@ export default function CaptureSettings() {
           done={status.listener}
           icon={LuSmartphone}
           title="Read payment app alerts"
-          body="Notification access. Gullak reads only the apps switched on below and ignores every other app."
+          body="Notification access. Gullak reads only the apps and bank emails switched on below and ignores everything else."
         >
           <button type="button" className="g-btn g-btn--sm g-btn--ink g-press" onClick={inbox.openListenerSettings}>
             Turn on
@@ -360,24 +465,19 @@ export default function CaptureSettings() {
 
       <AddApp inbox={inbox} ui={ui} />
 
+      <MailSettings inbox={inbox} ui={ui} status={status} today={today} />
+
       <div className="g-capture__more">
         <h3 className="g-capture__title">When nothing tells Gullak</h3>
         <p className="g-settings__note">
-          Some accounts send no SMS and their app sends no alert. For those, pay with Scan &amp; Pay, import the bank’s
-          statement, or let the weekly balance check find what’s missing.
+          Some accounts send no SMS, no app alert and no email. For those, import the bank’s statement whenever you like,
+          or let the weekly balance check find what’s missing.
         </p>
         <div className="g-settings__actions">
-          <button type="button" className="g-btn g-btn--sm g-btn--ink g-press" onClick={() => ui.openSheet('scanpay')}>
-            <LuQrCode aria-hidden="true" /> Scan &amp; Pay
-          </button>
           <button type="button" className="g-btn g-btn--sm g-press" onClick={() => ui.openSheet('statement')}>
             <LuFileSpreadsheet aria-hidden="true" /> Import a statement
           </button>
         </div>
-        <p className="g-settings__fine">
-          <LuInfo aria-hidden="true" /> Scan &amp; Pay scans a UPI QR, opens your UPI app with the amount filled in, and records the
-          payment when you come back. Long-press the Gullak icon for a shortcut.
-        </p>
       </div>
 
       <BalanceCheckSettings inbox={inbox} ui={ui} accounts={state.accounts} />

@@ -1,8 +1,8 @@
 // A stand-in for the native SpendCapture plugin, for working on the app in a browser (npm run dev:app).
 // It reads a handful of realistic messages with the same parser rules the phone uses, merges SMS and app
-// notifications for the same payment, and answers the plugin's calls from memory, Scan & Pay and statement
-// import included (with a sample QR and a pretend UPI app). Never in a production build.
-import { parseApp, parseSms } from './parse'
+// notifications for the same payment, and answers the plugin's calls from memory, bank email senders and
+// statement import included. Never in a production build.
+import { mailText, parseApp, parseMail, parseSms } from './parse'
 
 const MINUTE = 60_000
 const WINDOW = 15 * MINUTE
@@ -17,7 +17,16 @@ const MESSAGES = [
   { ago: 1500, source: 'sms', from: 'VM-HDFCBK-S', text: 'Rs.5,000.00 debited from A/c XX4821 on 22-11-26 to RAJESH SBI SAVINGS via IMPS. Ref 532112345681' },
   { ago: 1499, source: 'sms', from: 'VM-SBIINB', text: 'Dear SBI User, your A/c X0937-credited by Rs.5,000 on 22Nov26 transfer from SELF Ref No 532112345682 -SBI' },
   { ago: 1700, source: 'phonepe', title: 'Paid ₹342 to Uber', text: 'Debited from HDFC Bank - 4821' },
+  // A bank email, as Gmail's notification shows it (slice's wording; the details are made up).
+  {
+    ago: 520,
+    source: 'mail',
+    from: 'slice',
+    title: '',
+    text: 'Hi Asha,\n₹60 debited from your slice account xx5510 via UPI.\nTransaction date 23-Nov-26\nTo CHAI POINT\nRRN 532112345690\nBest,\nTeam slice',
+  },
 ]
+const MAIL_SAMPLE = MESSAGES.find((m) => m.source === 'mail')
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
 
@@ -42,19 +51,26 @@ const PHONE_APPS = [
   ['com.example.wallet', 'Sample Wallet', 300],
   ['com.whatsapp', 'WhatsApp', 5],
   ['in.swiggy.android', 'Swiggy', 120],
-  ['com.google.android.gm', 'Gmail', 20],
 ]
-const SAMPLE_QR = 'upi://pay?pa=chaipoint.blr@icici&pn=Chai%20Point&mc=5814&tr=STATIC01'
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+// Sender names compare without case or punctuation, as on the phone (MailSenders.java).
+const words = (text) => String(text ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 
 function build(now) {
   const spends = []
   let n = 0
   for (const message of MESSAGES) {
     const at = now - message.ago * MINUTE
-    const parsed = message.source === 'sms' ? parseSms(message.from, message.text) : parseApp(message.title, message.text)
+    const mail = message.source === 'mail'
+    const parsed =
+      message.source === 'sms'
+        ? parseSms(message.from, message.text)
+        : mail
+          ? parseMail(message.from, message.title, message.text)
+          : parseApp(message.title, message.text)
     if (!parsed) continue
-    const raw = { source: message.source, sender: message.from || message.source, text: message.title ? `${message.title}\n${message.text}` : message.text, at }
+    const text = mail ? mailText(message.title, message.text) : message.title ? `${message.title}\n${message.text}` : message.text
+    const raw = { source: message.source, sender: message.from || message.source, text, at }
     const twin = spends.find(
       (s) =>
         s.amountPaise === parsed.amountPaise &&
@@ -94,9 +110,11 @@ function build(now) {
 }
 
 export function createMockCapture() {
-  let spends = build(Date.now())
+  const startedAt = Date.now()
+  let spends = build(startedAt)
   let added = []
   let made = 0
+  const mail = { senders: ['slice'], last: { sender: MAIL_SAMPLE.from, at: startedAt - MAIL_SAMPLE.ago * MINUTE, payment: true } }
   const status = {
     available: true,
     mock: true,
@@ -105,7 +123,7 @@ export function createMockCapture() {
     listener: false,
     telephony: true,
     paused: false,
-    sources: Object.fromEntries([['sms', true], ...BUILT_IN.map(([id]) => [id, true])]),
+    sources: Object.fromEntries([['sms', true], ['mail', true], ...BUILT_IN.map(([id]) => [id, true])]),
     lookbackSet: false,
     lastScanAt: 0,
     sdk: 36,
@@ -116,7 +134,12 @@ export function createMockCapture() {
     ...BUILT_IN.map(([id, pkg, label]) => ({ id, package: pkg, label, builtIn: true, installed: INSTALLED.has(id), on: status.sources[id] !== false })),
     ...added.map(({ pkg, label }) => ({ id: pkg, package: pkg, label, builtIn: false, installed: true, on: status.sources[pkg] !== false })),
   ]
-  const statusNow = () => ({ ...clone(status), apps: apps(), unfiled: spends.filter((s) => s.status === 'unfiled').length })
+  const statusNow = () => ({
+    ...clone(status),
+    apps: apps(),
+    mail: { senders: [...mail.senders], apps: ['Gmail'], last: { ...mail.last } },
+    unfiled: spends.filter((s) => s.status === 'unfiled').length,
+  })
   const addSpend = (fields) => {
     made += 1
     const spend = {
@@ -217,41 +240,18 @@ export function createMockCapture() {
       delete status.sources[pkg]
       return statusNow()
     },
-    async scanQr() {
-      await wait(400)
-      return { value: SAMPLE_QR }
-    },
-    async listUpiApps() {
-      return {
-        apps: BUILT_IN.filter(([id]) => INSTALLED.has(id)).map(([, pkg, label]) => ({ package: pkg, label })),
+    async addMailSender({ name } = {}) {
+      const clean = String(name ?? '').replace(/\s+/g, ' ').trim().slice(0, 60)
+      if (!words(clean)) throw new Error('Type the sender’s name as your mail app shows it')
+      if (!mail.senders.some((s) => words(s) === words(clean))) {
+        if (mail.senders.length >= 20) throw new Error('That’s 20 senders already. Remove one first.')
+        mail.senders = [...mail.senders, clean]
       }
+      return statusNow()
     },
-    async payUpi() {
-      await wait(900)
-      const ref = String(Date.now()).slice(-12).padStart(12, '5')
-      return { resultCode: -1, response: `txnId=MOCK${ref}&responseCode=00&Status=SUCCESS&txnRef=STATIC01&ApprovalRefNo=${ref}`, extras: {} }
-    },
-    async recordPayment({ amountPaise, party, vpa, ref, note, accountId, account, bank, app }) {
-      const at = Date.now()
-      const text = `Paid ₹${amountPaise / 100} to ${party || vpa}${app ? ` with ${app}` : ''}`
-      const spend = addSpend({
-        amountPaise,
-        direction: 'out',
-        at,
-        party: party || null,
-        vpa: vpa || null,
-        ref: ref || null,
-        channel: 'upi',
-        account: account || null,
-        bank: bank || null,
-        accountId: accountId || null,
-        sources: ['scanpay'],
-        raw: [{ source: 'scanpay', sender: 'Scan & Pay', text, at }],
-        hint: note?.trim() || null,
-        hintAt: note?.trim() ? at : 0,
-      })
-      emit('changed')
-      return { id: spend.id, duplicate: false }
+    async removeMailSender({ name } = {}) {
+      mail.senders = mail.senders.filter((s) => words(s) !== words(name))
+      return statusNow()
     },
     async importSpends({ rows = [] }) {
       for (const row of rows) {

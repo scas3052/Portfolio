@@ -3,12 +3,13 @@
 # message here first, then teach both parsers.
 #
 # == <name>            starts a case
-# kind: sms|app|share   which parser runs
-# from: <sender>        SMS sender id (sms), or gpay|phonepe|paytm (app)
-# title: <text>         notification title (app only)
-# text: <text>          message body; \n stands for a line break
+# kind: sms|app|share|mail  which parser runs
+# from: <sender>        SMS sender id (sms), gpay|phonepe|paytm (app), or the sender's name as the mail app
+#                       shows it (mail)
+# title: <text>         notification title (app), or the email's subject (mail)
+# text: <text>          message body, or the start of the email (mail); \n stands for a line break
 # expect: none          the message must be skipped
-# amount, dir, account, party, vpa, ref, channel, balance
+# amount, dir, account, party, vpa, ref, channel, balance, bank
 #                       expected fields; "-" means the field must be empty. Fields left out aren't checked.
 
 == hdfc upi sent, multi-line
@@ -432,4 +433,70 @@ party: -
 == shared text without an amount
 kind: share
 text: See you at 5
+expect: none
+
+# ---- bank emails, as the mail app's notification shows them: sender, subject, then the start of the email ----
+
+== slice upi debit email
+kind: mail
+from: slice
+text: Hi Asha,\n₹10 debited from your slice account xx4410 via UPI.\nTransaction date 25-Nov-26\nTo NTI00227\nRRN 632900000843\nBest,\nTeam slice\nDigital safety tips\nTo talk to us, drop an email to help@slice.bank.in\n© slice small finance bank. All rights reserved.
+amount: 10.00
+dir: out
+account: 4410
+party: NTI00227
+vpa: -
+ref: 632900000843
+channel: upi
+balance: -
+bank: slice
+
+== slice debit email whose notification stops inside the reference
+kind: mail
+from: Team slice
+text: Hi Asha, ₹10 debited from your slice account xx4410 via UPI. Transaction date 25-Nov-26 To NTI00227 RRN 6329000…
+amount: 10.00
+dir: out
+account: 4410
+party: NTI00227
+ref: -
+bank: slice
+
+# Wording assumed from the debit email above: replace it with a real credit email when one arrives.
+== slice upi credit email
+kind: mail
+from: slice
+text: Hi Asha, ₹500 credited to your slice account xx4410 via UPI. Transaction date 25-Nov-26 From RAVI KUMAR RRN 632900000844 Best, Team slice
+amount: 500.00
+dir: in
+account: 4410
+party: RAVI KUMAR
+ref: 632900000844
+channel: upi
+bank: slice
+
+== an email from a sender named after its bank
+kind: mail
+from: HDFC Bank InstaAlerts
+title: You have done a UPI txn. Check details!
+text: Dear Customer, Rs.500.00 has been debited from account 1234 to VPA zomato@hdfcbank ZOMATO on 21-11-26.
+amount: 500.00
+dir: out
+account: 1234
+party: -
+vpa: zomato@hdfcbank
+channel: upi
+bank: HDFC Bank
+
+== an offer email from a listed sender
+kind: mail
+from: slice
+title: You won a scratch card!
+text: Hi Asha, ₹50 cashback credited to your rewards wallet. Scratch now to claim it.
+expect: none
+
+== a failed payment email
+kind: mail
+from: slice
+text: Hi Asha, your UPI payment of ₹250 to NTI00227 failed. Any amount debited will be refunded in 3-5 working days.
 expect: none

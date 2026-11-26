@@ -22,7 +22,7 @@ import org.junit.Test;
 /** Runs every case in payment-fixtures.txt, the same file the JavaScript parser is tested with. */
 public class PaymentParserTest {
 
-    private static final String[] FIELDS = {"amount", "dir", "account", "party", "vpa", "ref", "channel", "balance"};
+    private static final String[] FIELDS = {"amount", "dir", "account", "party", "vpa", "ref", "channel", "balance", "bank"};
 
     private static final class Fixture {
         final String name;
@@ -62,6 +62,7 @@ public class PaymentParserTest {
         if ("sms".equals(kind)) return PaymentParser.parseSms(f.get("from"), f.get("text"));
         if ("app".equals(kind)) return PaymentParser.parseApp(f.get("title"), f.get("text"));
         if ("share".equals(kind)) return PaymentParser.parseShared(f.get("text"));
+        if ("mail".equals(kind)) return PaymentParser.parseMail(f.get("from"), f.get("title"), f.get("text"));
         throw new IllegalArgumentException("Unknown kind " + kind);
     }
 
@@ -80,6 +81,7 @@ public class PaymentParserTest {
             case "ref": value = p.ref; break;
             case "channel": value = p.channel; break;
             case "balance": value = p.balancePaise < 0 ? null : rupees(p.balancePaise); break;
+            case "bank": value = p.bank; break;
             default: throw new IllegalArgumentException(field);
         }
         return value == null ? "-" : value;
@@ -146,6 +148,28 @@ public class PaymentParserTest {
     public void amountsMustBeAboveZeroAndBelowHundredCrore() {
         assertNull(PaymentParser.parseSms("VM-HDFCBK", "Rs.0.00 debited from A/c XX1234"));
         assertNull(PaymentParser.parseSms("VM-HDFCBK", "Rs.1,00,00,00,000 debited from A/c XX1234"));
+    }
+
+    @Test
+    public void mailTextDropsTheSubjectGmailRepeats() {
+        assertEquals("Debit alert. Hi, \u20B910 debited", PaymentParser.mailText("Debit alert", "Debit alert\nHi, \u20B910 debited"));
+        assertEquals("Hi, \u20B910 debited", PaymentParser.mailText("", "Hi, \u20B910 debited"));
+        assertEquals("Debit alert", PaymentParser.mailText("Debit alert", null));
+    }
+
+    @Test
+    public void banksInEmailSenderNames() {
+        assertEquals("slice", PaymentParser.bankInSender("slice"));
+        assertEquals("slice", PaymentParser.bankInSender("Team slice"));
+        assertEquals("HDFC Bank", PaymentParser.bankInSender("HDFC Bank InstaAlerts"));
+        assertNull(PaymentParser.bankInSender("Slicepay Offers"));
+        assertNull(PaymentParser.bankInSender(null));
+        assertNull(PaymentParser.bankInText("Paid \u20B9200 at Pizza Slice"));
+    }
+
+    @Test
+    public void anEmailDateIsNeverReadAsAccountDigits() {
+        assertNull(PaymentParser.parseMail("slice", "", "Hi, \u20B910 debited via UPI on 25-11-2026 to NTI00227").account);
     }
 
     @Test
