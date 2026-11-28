@@ -7,7 +7,7 @@ import { configuredProviders } from './providers.js'
 
 const MAX_BODY = 64 * 1024
 const MAX_MESSAGES = 40
-const MAX_TOOLS = 16
+const MAX_TOOLS = 24
 const MAX_TOOL_CALLS = 8
 const MAX_OUTPUT_TOKENS = 4000
 const DEFAULT_OUTPUT_TOKENS = 900
